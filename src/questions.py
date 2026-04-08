@@ -232,7 +232,8 @@ def fetch_all_questions(
     print(f"\nBaixando questoes...")
     os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
 
-    with tqdm(total=total, initial=cached_count, unit="q") as pbar:
+    with open(CACHE_FILE, "a", encoding="utf-8") as outfile, \
+         tqdm(total=total, initial=cached_count, unit="q") as pbar:
         while True:
             try:
                 payload = {"filters": filters_no_topic}
@@ -260,24 +261,25 @@ def fetch_all_questions(
                 if not page_questions:
                     break
 
-                # Filtrar duplicatas e gravar direto no disco
-                new_questions = []
+                # Filtrar duplicatas e gravar direto no arquivo aberto
+                new_count = 0
                 for q in page_questions:
                     qid = q.get("id")
                     if qid and qid not in seen_ids:
-                        new_questions.append(q)
+                        outfile.write(json.dumps(q, ensure_ascii=False))
+                        outfile.write("\n")
                         seen_ids.add(qid)
+                        new_count += 1
 
-                if new_questions:
-                    append_questions(new_questions)
+                if new_count > 0 and page % 5 == 0:
+                    outfile.flush()
 
-                pbar.update(len(new_questions))
+                pbar.update(new_count)
 
                 # Extrair next token
                 token_pag = data.get("token_pagination", {})
                 next_token = token_pag.get("next_page_token", None) if isinstance(token_pag, dict) else None
 
-                # Salvar token periodicamente
                 if next_token and page % 20 == 0:
                     save_token(next_token)
 
@@ -287,6 +289,7 @@ def fetch_all_questions(
                 page += 1
 
             except Exception as e:
+                outfile.flush()
                 print(f"\nErro na pagina {page}: {e}")
                 if next_token:
                     save_token(next_token)
