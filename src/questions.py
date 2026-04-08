@@ -182,7 +182,20 @@ def fetch_all_questions(
         if next_token:
             print(f"Retomando do token de paginacao salvo...")
 
-    page = 1
+    # Se tem cache mas nao tem token, calcular pagina inicial
+    # API limita page-based a 10k (100 paginas de 100)
+    if cached and not next_token:
+        start_page = (len(cached) // PER_PAGE) + 1
+        if start_page > 100:
+            print(f"Cache tem {len(cached)} questoes mas sem token de paginacao.")
+            print("Limpando cache para rebaixar do zero com token...")
+            questions = []
+            seen_ids = set()
+            cached = []
+            start_page = 1
+        page = start_page
+    else:
+        page = 1
     with tqdm(total=total, initial=len(cached), unit="q") as pbar:
         while True:
             try:
