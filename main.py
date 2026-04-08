@@ -114,13 +114,16 @@ def main():
         # Modo teste: questoes ja na memoria
         generate_html(questions, filter_options, output)
     else:
-        # Modo completo: gerar em streaming do JSONL
+        # Modo completo: converter JSONL -> SQLite -> HTML com sql.js
         from src.questions import CACHE_FILE
-        from src.html_generator import generate_html_streaming
+        from src.database import build_from_jsonl, DB_PATH
+        from src.html_sqlite import generate_sqlite_html
         if not os.path.exists(CACHE_FILE):
             print("Nenhuma questao disponivel.")
             sys.exit(1)
-        generate_html_streaming(CACHE_FILE, filter_options, output)
+        print(f"Convertendo JSONL para SQLite...")
+        build_from_jsonl(CACHE_FILE)
+        generate_sqlite_html(DB_PATH, filter_options, output)
 
     print(f"\nConcluido! Abra o arquivo '{output}' no navegador.")
 
