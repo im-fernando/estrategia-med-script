@@ -8,7 +8,8 @@ from tqdm import tqdm
 from src.api_client import post
 
 
-CACHE_FILE = "data/questions.json"
+CACHE_FILE = "data/questions.jsonl"  # Uma questao por linha (append-friendly)
+TOKEN_FILE = "data/questions_token.txt"
 PER_PAGE = 100
 
 
@@ -80,19 +81,62 @@ def fetch_total_count(session: requests.Session, filters: list[dict]) -> int:
     return counts[0] if counts else 0
 
 
-def load_cache() -> list[dict]:
-    """Carrega questoes do cache local."""
+def load_cache_ids() -> set:
+    """Carrega apenas os IDs das questoes do cache JSONL."""
+    ids = set()
     if os.path.exists(CACHE_FILE):
         with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    q = json.loads(line)
+                    qid = q.get("id")
+                    if qid:
+                        ids.add(qid)
+                except json.JSONDecodeError:
+                    continue
+    return ids
 
 
-def save_cache(questions: list[dict]):
-    """Salva questoes no cache local."""
+def append_questions(questions: list[dict]):
+    """Append questoes ao cache JSONL (uma por linha)."""
     os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(questions, f, ensure_ascii=False)
+    with open(CACHE_FILE, "a", encoding="utf-8") as f:
+        for q in questions:
+            f.write(json.dumps(q, ensure_ascii=False) + "\n")
+
+
+def load_cache() -> list[dict]:
+    """Carrega todas as questoes do cache JSONL."""
+    questions = []
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    questions.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    return questions
+
+
+def save_token(token: str):
+    """Salva token de paginacao."""
+    os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
+    with open(TOKEN_FILE, "w") as f:
+        f.write(token)
+
+
+def load_token() -> str:
+    """Carrega token de paginacao."""
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, "r") as f:
+            return f.read().strip()
+    return ""
 
 
 def _paginate_topic(session, catalogs, topic_id, topic_name, seen_ids, pbar, filter_options=None):
@@ -145,9 +189,8 @@ def fetch_all_questions(
     catalogs: list[dict],
     filter_options: dict,
     resume: bool = True,
-) -> list[dict]:
-    """Busca todas as questoes sem filtro de topico (pega tudo)."""
-    # Contar total SEM filtro de topico (como o browser faz)
+) -> None:
+    """Baixa todas as questoes direto pro disco (JSONL). Nao acumula na RAM."""
     filters_no_topic = build_search_filters(catalogs, topic_ids=None, filter_options=filter_options)
     print("\nContando questoes...")
     total = fetch_total_count(session, filters_no_topic)
@@ -156,47 +199,40 @@ def fetch_all_questions(
     print(f"  Estimativa: {pages_estimate} paginas de {PER_PAGE} questoes")
 
     if total == 0:
-        return []
+        return
 
     input("\nPressione Enter para iniciar o download (Ctrl+C para cancelar)...")
 
-    cached = load_cache() if resume else []
-    if cached:
-        print(f"Cache encontrado com {len(cached)} questoes.")
+    # Carregar IDs ja baixados (so IDs, nao as questoes inteiras)
+    seen_ids = load_cache_ids() if resume else set()
+    cached_count = len(seen_ids)
+    if cached_count:
+        print(f"Cache encontrado com {cached_count} questoes.")
 
-    seen_ids = {q.get("id") for q in cached if q.get("id")}
-    questions = list(cached)
-
-    if cached and len(cached) >= total:
+    if cached_count >= total:
         print("Todas as questoes ja estao no cache.")
-        return questions
+        return
+
+    # Carregar token de retomada
+    next_token = load_token() if resume else ""
+    if next_token and cached_count > 0:
+        print(f"Retomando do token de paginacao salvo...")
+
+    # Se tem cache mas nao tem token, limpar pra comecar do zero
+    if cached_count > 0 and not next_token and cached_count >= 10000:
+        print(f"Cache tem {cached_count} questoes mas sem token. Recomeçando...")
+        seen_ids = set()
+        cached_count = 0
+        os.remove(CACHE_FILE)
+
+    page = 1
+    if cached_count > 0 and not next_token:
+        page = (cached_count // PER_PAGE) + 1
 
     print(f"\nBaixando questoes...")
+    os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
 
-    # Carregar token de paginacao do cache se existir
-    token_file = CACHE_FILE.replace(".json", "_token.txt")
-    next_token = None
-    if cached and os.path.exists(token_file):
-        with open(token_file, "r") as f:
-            next_token = f.read().strip() or None
-        if next_token:
-            print(f"Retomando do token de paginacao salvo...")
-
-    # Se tem cache mas nao tem token, calcular pagina inicial
-    # API limita page-based a 10k (100 paginas de 100)
-    if cached and not next_token:
-        start_page = (len(cached) // PER_PAGE) + 1
-        if start_page > 100:
-            print(f"Cache tem {len(cached)} questoes mas sem token de paginacao.")
-            print("Limpando cache para rebaixar do zero com token...")
-            questions = []
-            seen_ids = set()
-            cached = []
-            start_page = 1
-        page = start_page
-    else:
-        page = 1
-    with tqdm(total=total, initial=len(cached), unit="q") as pbar:
+    with tqdm(total=total, initial=cached_count, unit="q") as pbar:
         while True:
             try:
                 payload = {"filters": filters_no_topic}
@@ -206,7 +242,6 @@ def fetch_all_questions(
                     "sort": "key_pedagogical_order",
                 }
 
-                # Usar token pagination apos 10k resultados
                 if next_token:
                     params["token"] = next_token
                 else:
@@ -225,26 +260,26 @@ def fetch_all_questions(
                 if not page_questions:
                     break
 
-                new_count = 0
+                # Filtrar duplicatas e gravar direto no disco
+                new_questions = []
                 for q in page_questions:
                     qid = q.get("id")
                     if qid and qid not in seen_ids:
-                        questions.append(q)
+                        new_questions.append(q)
                         seen_ids.add(qid)
-                        new_count += 1
 
-                pbar.update(new_count)
+                if new_questions:
+                    append_questions(new_questions)
 
-                # Extrair next token para proxima pagina
+                pbar.update(len(new_questions))
+
+                # Extrair next token
                 token_pag = data.get("token_pagination", {})
                 next_token = token_pag.get("next_page_token", None) if isinstance(token_pag, dict) else None
 
-                # Salvar cache a cada 50 paginas (5000 questoes) em vez de 10
-                if page % 50 == 0:
-                    save_cache(questions)
-                    if next_token:
-                        with open(token_file, "w") as f:
-                            f.write(next_token)
+                # Salvar token periodicamente
+                if next_token and page % 20 == 0:
+                    save_token(next_token)
 
                 if len(page_questions) < PER_PAGE:
                     break
@@ -253,21 +288,15 @@ def fetch_all_questions(
 
             except Exception as e:
                 print(f"\nErro na pagina {page}: {e}")
-                save_cache(questions)
                 if next_token:
-                    with open(token_file, "w") as f:
-                        f.write(next_token)
-                print("Cache salvo. Voce pode retomar depois.")
+                    save_token(next_token)
+                print(f"Cache salvo ({len(seen_ids)} questoes). Voce pode retomar depois.")
                 raise
 
-    # Salvar cache final
-    save_cache(questions)
     if next_token:
-        with open(token_file, "w") as f:
-            f.write(next_token)
+        save_token(next_token)
 
-    print(f"\nTotal de questoes baixadas: {len(questions)}")
-    return questions
+    print(f"\nTotal de questoes baixadas: {len(seen_ids)}")
 
 
 def _fetch_page(session, filters, page, per_page, debug=False):

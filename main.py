@@ -1,4 +1,5 @@
 import getpass
+import os
 import sys
 
 from src.auth import login, load_token_from_cookies, has_cookies_file
@@ -96,23 +97,35 @@ def main():
                 session, config, catalogs, filter_options, per_topic=15
             )
         else:
-            questions = fetch_all_questions(session, config, catalogs, filter_options)
+            fetch_all_questions(session, config, catalogs, filter_options)
+            questions = None  # Sera lido do disco no gerador
     except KeyboardInterrupt:
         print("\nInterrompido pelo usuario. Cache salvo.")
-        sys.exit(0)
+        questions = None
     except Exception as e:
         print(f"Erro ao buscar questoes: {e}")
         print("Tentando gerar HTML com questoes do cache...")
-        from src.questions import load_cache
-        questions = load_cache()
-        if not questions:
-            print("Nenhuma questao disponivel.")
-            sys.exit(1)
+        questions = None
 
     # 6. Gerar HTML
     output = "questoes_teste.html" if test_mode else "questoes.html"
     print(f"\n[5/5] Gerando HTML ({output})...")
-    generate_html(questions, filter_options, output)
+    if questions is not None:
+        # Modo teste: questoes ja na memoria
+        generate_html(questions, filter_options, output)
+    else:
+        # Modo completo: ler do JSONL em streaming
+        from src.questions import CACHE_FILE, load_cache
+        if not os.path.exists(CACHE_FILE):
+            print("Nenhuma questao disponivel.")
+            sys.exit(1)
+        print(f"Carregando questoes do cache ({CACHE_FILE})...")
+        questions = load_cache()
+        if not questions:
+            print("Nenhuma questao disponivel.")
+            sys.exit(1)
+        print(f"  {len(questions)} questoes carregadas.")
+        generate_html(questions, filter_options, output)
 
     print(f"\nConcluido! Abra o arquivo '{output}' no navegador.")
 
