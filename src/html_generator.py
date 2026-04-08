@@ -172,6 +172,7 @@ def _extract_filter_values(questions: list[dict]) -> dict:
         "answer_types": set(),
         "jurys": set(),
         "regions": set(),
+        "finalidades": set(),
     }
     for q in questions:
         for topic in q.get("topics", []):
@@ -198,6 +199,10 @@ def _extract_filter_values(questions: list[dict]) -> dict:
         banca = _catalog_name(exam, CATALOG_BANCA)
         if banca:
             values["jurys"].add(banca)
+
+        finalidade = _catalog_name(exam, CATALOG_FINALIDADE)
+        if finalidade:
+            values["finalidades"].add(finalidade)
 
     return {k: sorted(v) for k, v in values.items()}
 
@@ -255,6 +260,7 @@ def _render_question(q: dict, idx: int) -> str:
     exam = _exam_data(q)
     inst_name = _catalog_name(exam, CATALOG_INSTITUTION)
     jury_name = _catalog_name(exam, CATALOG_BANCA)
+    finalidade_name = _catalog_name(exam, CATALOG_FINALIDADE)
     year = exam.get("year", "")
 
     answer_type = q.get("answer_type", "")
@@ -299,6 +305,7 @@ def _render_question(q: dict, idx: int) -> str:
         f'data-year="{_escape(str(year))}" '
         f'data-type="{_escape(answer_type)}" '
         f'data-jury="{_escape(jury_name)}" '
+        f'data-finalidade="{_escape(finalidade_name)}" '
         f'data-region="{_escape(region_name)}" '
         f'data-has-text-solution="{str(sol_info["has_text"]).lower()}" '
         f'data-has-video-solution="{str(sol_info["has_video"]).lower()}" '
@@ -409,11 +416,31 @@ def generate_html(questions: list[dict], filter_options: dict, output_path: str 
     topics_tree = filter_options.get("topics", [])
     specialty_filter_html = _specialty_filter_markup(topics_tree, fv["specialties"])
 
+    # Instituicoes: usar filter_options se disponivel (343 itens), senao fallback das questoes
+    inst_names = sorted(
+        {item["name"] for item in filter_options.get("institution_id", []) if item.get("name")}
+    ) or fv["institutions"]
     institution_filter_html = _simple_checkbox_filter(
-        fv["institutions"], "filter-institution-tree", "filter-institution-cb", "Instituicoes"
+        inst_names, "filter-institution-tree", "filter-institution-cb", "Instituicoes"
     )
+
     year_filter_html = _simple_checkbox_filter(fv["years"], "filter-year-tree", "filter-year-cb", "Anos")
-    jury_filter_html = _simple_checkbox_filter(fv["jurys"], "filter-jury-tree", "filter-jury-cb", "Bancas")
+
+    # Banca: usar filter_options se disponivel (47 itens)
+    banca_names = sorted(
+        {item["name"] for item in filter_options.get("jury_id", []) if item.get("name")}
+    ) or fv["jurys"]
+    jury_filter_html = _simple_checkbox_filter(
+        banca_names, "filter-jury-tree", "filter-jury-cb", "Bancas"
+    )
+
+    # Finalidade: usar filter_options (24 itens)
+    finalidade_names = sorted(
+        {item["name"] for item in filter_options.get("goal_id", []) if item.get("name")}
+    ) or fv["finalidades"]
+    finalidade_filter_html = _simple_checkbox_filter(
+        finalidade_names, "filter-finalidade-tree", "filter-finalidade-cb", "Finalidades"
+    )
 
     # Regioes: extrair estados unicos do S3 locations + das questoes
     regions_data = filter_options.get("regions", [])
@@ -1036,6 +1063,10 @@ body {{
             {year_filter_html}
         </div>
         <div class="filter-group" style="grid-column: 1 / -1;">
+            <label>Finalidade</label>
+            {finalidade_filter_html}
+        </div>
+        <div class="filter-group" style="grid-column: 1 / -1;">
             <label>Banca</label>
             {jury_filter_html}
         </div>
@@ -1296,6 +1327,7 @@ function applyFilters() {{
     const institutions = getTreeCheckboxValues('filter-institution-tree', '.filter-institution-cb:checked');
     const years = getTreeCheckboxValues('filter-year-tree', '.filter-year-cb:checked');
     const jurys = getTreeCheckboxValues('filter-jury-tree', '.filter-jury-cb:checked');
+    const finalidades = getTreeCheckboxValues('filter-finalidade-tree', '.filter-finalidade-cb:checked');
     const regions = getTreeCheckboxValues('filter-region-tree', '.filter-region-cb:checked');
 
     const allowTypes = [];
@@ -1322,6 +1354,7 @@ function applyFilters() {{
         if (institutions.length && !institutions.includes(q.dataset.institution)) return false;
         if (years.length && !years.includes(q.dataset.year)) return false;
         if (jurys.length && !jurys.includes(q.dataset.jury)) return false;
+        if (finalidades.length && !finalidades.includes(q.dataset.finalidade)) return false;
         if (regions.length && !regions.includes(q.dataset.region)) return false;
         if (!allowTypes.length || !allowTypes.includes(q.dataset.type)) return false;
 
@@ -1384,7 +1417,7 @@ function clearFilters() {{
     document.querySelectorAll(
         '#filter-specialty-tree .filter-topic-cb, #filter-region-tree .filter-region-cb, '
         + '#filter-institution-tree .filter-institution-cb, #filter-year-tree .filter-year-cb, '
-        + '#filter-jury-tree .filter-jury-cb'
+        + '#filter-jury-tree .filter-jury-cb, #filter-finalidade-tree .filter-finalidade-cb'
     ).forEach(cb => {{ cb.checked = false; }});
     ['ft-true-or-false','ft-multiple-choice','ft-discursive',
      'fs-with-text','fs-without-text','fs-with-video','fs-without-video',

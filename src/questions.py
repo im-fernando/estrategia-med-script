@@ -12,7 +12,11 @@ CACHE_FILE = "data/questions.json"
 PER_PAGE = 100
 
 
-def build_search_filters(catalogs: list[dict], topic_ids: list[str] = None) -> list[dict]:
+def build_search_filters(
+    catalogs: list[dict],
+    topic_ids: list[str] = None,
+    filter_options: dict = None,
+) -> list[dict]:
     """Monta payload de busca no formato exato da API.
 
     Ordem: topic (se houver) -> goal_id -> answer_types -> situacao -> solucoes
@@ -28,16 +32,23 @@ def build_search_filters(catalogs: list[dict], topic_ids: list[str] = None) -> l
             "origin": "questions",
         })
 
-    # 2. Goal_id pre-selecionado dos catalogs
+    # 2. Goal_id - usar TODAS as finalidades se disponiveis, senao preselected
     for catalog in catalogs:
         preselected = catalog.get("preselected_values", [])
-        if preselected:
-            filters.append({
-                "add": True,
-                "entity": catalog["key"],
-                "entity_ids": preselected,
-                "origin": catalog.get("origin", "catalogs"),
-            })
+        if not preselected:
+            continue
+        key = catalog.get("key", "")
+        all_ids = []
+        if filter_options and key in filter_options:
+            all_ids = [item["id"] for item in filter_options[key] if item.get("id")]
+        if not all_ids:
+            all_ids = preselected
+        filters.append({
+            "add": True,
+            "entity": key,
+            "entity_ids": all_ids,
+            "origin": catalog.get("origin", "catalogs"),
+        })
 
     # 3. Tipos de questao - todos
     filters.append({"add": True, "entity": "answer_type", "entity_ids": ["TRUE_OR_FALSE"], "filtro_includente": True})
@@ -84,9 +95,9 @@ def save_cache(questions: list[dict]):
         json.dump(questions, f, ensure_ascii=False)
 
 
-def _paginate_topic(session, catalogs, topic_id, topic_name, seen_ids, pbar):
+def _paginate_topic(session, catalogs, topic_id, topic_name, seen_ids, pbar, filter_options=None):
     """Busca todas as questoes de um topico com paginacao."""
-    filters = build_search_filters(catalogs, topic_ids=[topic_id])
+    filters = build_search_filters(catalogs, topic_ids=[topic_id], filter_options=filter_options)
     questions = []
     page = 1
 
@@ -135,28 +146,19 @@ def fetch_all_questions(
     filter_options: dict,
     resume: bool = True,
 ) -> list[dict]:
-    """Busca todas as questoes por topico raiz com paginacao e cache."""
-    topics = filter_options.get("topics", [])
-    root_topics = [t for t in topics if t.get("_depth", 0) == 0]
-
-    if not root_topics:
-        print("Nenhum topico raiz encontrado!")
-        return []
-
-    # Contar total por topico
-    print("\nContando questoes por topico...")
-    total = 0
-    topic_counts = []
-    for t in root_topics:
-        filters = build_search_filters(catalogs, topic_ids=[t["id"]])
-        count = fetch_total_count(session, filters)
-        topic_counts.append((t, count))
-        total += count
-        print(f"  {t['name']}: {count}")
-    print(f"  Total: {total}")
+    """Busca todas as questoes sem filtro de topico (pega tudo)."""
+    # Contar total SEM filtro de topico (como o browser faz)
+    filters_no_topic = build_search_filters(catalogs, topic_ids=None, filter_options=filter_options)
+    print("\nContando questoes...")
+    total = fetch_total_count(session, filters_no_topic)
+    print(f"  Total: {total} questoes")
+    pages_estimate = math.ceil(total / PER_PAGE)
+    print(f"  Estimativa: {pages_estimate} paginas de {PER_PAGE} questoes")
 
     if total == 0:
         return []
+
+    input("\nPressione Enter para iniciar o download (Ctrl+C para cancelar)...")
 
     cached = load_cache() if resume else []
     if cached:
@@ -165,21 +167,56 @@ def fetch_all_questions(
     seen_ids = {q.get("id") for q in cached if q.get("id")}
     questions = list(cached)
 
-    print(f"\nBaixando questoes ({len(root_topics)} topicos)...")
+    start_page = (len(cached) // PER_PAGE) + 1 if cached else 1
+    if start_page > pages_estimate and cached:
+        print("Todas as questoes ja estao no cache.")
+        return questions
+
+    print(f"\nBaixando questoes (pagina {start_page} a {pages_estimate})...")
 
     with tqdm(total=total, initial=len(cached), unit="q") as pbar:
-        for topic, count in topic_counts:
-            if count == 0:
-                continue
-            name = topic.get("name", "?")
-            pbar.set_description(name[:25])
+        page = start_page
+        while True:
             try:
-                new_qs = _paginate_topic(
-                    session, catalogs, topic["id"], name, seen_ids, pbar
+                payload = {"filters": filters_no_topic}
+                data = post(
+                    session,
+                    "/bff/questions/search",
+                    json_data=payload,
+                    params={
+                        "page": page,
+                        "perPage": PER_PAGE,
+                        "order": "ASC",
+                        "sort": "key_pedagogical_order",
+                    },
                 )
-                questions.extend(new_qs)
+
+                raw = data.get("data", [])
+                page_questions = raw if isinstance(raw, list) else []
+
+                if not page_questions:
+                    break
+
+                new_count = 0
+                for q in page_questions:
+                    qid = q.get("id")
+                    if qid and qid not in seen_ids:
+                        questions.append(q)
+                        seen_ids.add(qid)
+                        new_count += 1
+
+                pbar.update(new_count)
+
+                if page % 10 == 0:
+                    save_cache(questions)
+
+                if len(page_questions) < PER_PAGE:
+                    break
+
+                page += 1
+
             except Exception as e:
-                print(f"\nErro em {name}: {e}")
+                print(f"\nErro na pagina {page}: {e}")
                 save_cache(questions)
                 print("Cache salvo. Voce pode retomar depois.")
                 raise
@@ -259,7 +296,7 @@ def fetch_test_questions(
         if not topic_id:
             continue
 
-        filters = build_search_filters(catalogs, topic_ids=[topic_id])
+        filters = build_search_filters(catalogs, topic_ids=[topic_id], filter_options=filter_options)
 
         try:
             page_questions = _fetch_page(session, filters, 1, per_topic)
