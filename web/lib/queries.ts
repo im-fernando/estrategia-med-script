@@ -67,9 +67,15 @@ function buildWhere(filters: Filters): { where: string; params: unknown[] } {
     params.push(...filters.types);
   }
   if (filters.specialties?.length) {
-    const specClauses = filters.specialties.map(() => "topics LIKE ?");
+    // Buscar por nome OU por path contendo o nome (pega filhos tambem)
+    const specClauses = filters.specialties.map(
+      () => "(topics LIKE ? OR topics LIKE ?)"
+    );
     clauses.push(`(${specClauses.join(" OR ")})`);
-    filters.specialties.forEach((s) => params.push(`%"n":"${s}"%`));
+    filters.specialties.forEach((s) => {
+      params.push(`%"n": "${s}"%`);  // nome exato no array de topics
+      params.push(`%${s}[$$]%`);     // pai no path de algum topic (pega filhos)
+    });
   }
   if (filters.showOutdated === false) {
     clauses.push("labels NOT LIKE '%OUTDATED%'");
