@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useState } from "react";
-import type { FilterValues, Filters } from "@/lib/types";
+import type { FilterValues, Filters, TopicNode } from "@/lib/types";
 
 interface FiltersProps {
   filterValues: FilterValues;
@@ -74,6 +74,58 @@ function CheckboxList({
   );
 }
 
+function TopicAccordion({
+  nodes,
+  selected,
+  onToggle,
+}: {
+  nodes: TopicNode[];
+  selected: string[];
+  onToggle: (items: string[]) => void;
+}) {
+  const toggle = (name: string) => {
+    const next = selected.includes(name)
+      ? selected.filter((s) => s !== name)
+      : [...selected, name];
+    onToggle(next);
+  };
+
+  const render = (items: TopicNode[]) =>
+    items.map((n) =>
+      n.children && n.children.length ? (
+        <details key={n.path} className="tree-branch">
+          <summary className="tree-summary">
+            <span className="tree-chevron" aria-hidden="true" />
+            <label className="tree-label" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="checkbox"
+                className="em-checkbox"
+                checked={selected.includes(n.name)}
+                onChange={() => toggle(n.name)}
+              />
+              <span className="tree-name">{n.name}</span>
+            </label>
+          </summary>
+          <div className="tree-children">{render(n.children)}</div>
+        </details>
+      ) : (
+        <div className="tree-leaf" key={n.path}>
+          <label className="tree-label">
+            <input
+              type="checkbox"
+              className="em-checkbox"
+              checked={selected.includes(n.name)}
+              onChange={() => toggle(n.name)}
+            />
+            <span className="tree-name">{n.name}</span>
+          </label>
+        </div>
+      )
+    );
+
+  return <div className="tree-filter-scroll">{render(nodes)}</div>;
+}
+
 export function Filters({ filterValues, filters, onChange }: FiltersProps) {
   const [open, setOpen] = useState(false);
 
@@ -115,12 +167,23 @@ export function Filters({ filterValues, filters, onChange }: FiltersProps) {
           </div>
         </div>
 
-        <CheckboxList
-          label="Especialidade"
-          items={filterValues.specialties}
-          selected={filters.specialties || []}
-          onToggle={(v) => update({ specialties: v })}
-        />
+        <div className="filter-group" style={{ gridColumn: "1 / -1" }}>
+          <label>Especialidade e assuntos</label>
+          {filterValues.topicsTree?.length ? (
+            <TopicAccordion
+              nodes={filterValues.topicsTree}
+              selected={filters.specialties || []}
+              onToggle={(v) => update({ specialties: v })}
+            />
+          ) : (
+            <CheckboxList
+              label="Especialidade"
+              items={filterValues.specialties}
+              selected={filters.specialties || []}
+              onToggle={(v) => update({ specialties: v })}
+            />
+          )}
+        </div>
         <CheckboxList
           label="Instituicao"
           items={filterValues.institutions}

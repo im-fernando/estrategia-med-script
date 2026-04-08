@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import type { Filters, Question, Alternative, FilterValues } from "./types";
+import type { Filters, Question, Alternative, FilterValues, TopicNode } from "./types";
 
 export const PER_PAGE = 50;
 
@@ -179,8 +179,41 @@ export function fetchFilterValues(): FilterValues {
     }[]
   ).map((r) => r.name);
 
+  let topicsTree: TopicNode[] | undefined = undefined;
+  try {
+    const rows = db
+      .prepare(
+        "SELECT path, name, parent_path, depth FROM topics ORDER BY depth, name"
+      )
+      .all() as { path: string; name: string; parent_path: string | null; depth: number }[];
+
+    const byPath = new Map<string, TopicNode & { parent_path: string | null }>();
+    for (const r of rows) {
+      byPath.set(r.path, { name: r.name, path: r.path, children: [], parent_path: r.parent_path });
+    }
+
+    const roots: TopicNode[] = [];
+    for (const node of byPath.values()) {
+      if (node.parent_path && byPath.has(node.parent_path)) {
+        byPath.get(node.parent_path)!.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    const sort = (nodes: TopicNode[]) => {
+      nodes.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      nodes.forEach((n) => sort(n.children));
+    };
+    sort(roots);
+    topicsTree = roots;
+  } catch {
+    topicsTree = undefined;
+  }
+
   return {
     specialties,
+    topicsTree,
     institutions: distinct("institution"),
     years,
     finalidades: distinct("finalidade"),

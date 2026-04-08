@@ -27,7 +27,6 @@ function filtersToParams(filters: FiltersType): string {
 }
 
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [filterValues, setFilterValues] = useState<FilterValues | null>(null);
@@ -38,8 +37,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const { answers, save, clear, stats } = useAnswers();
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => setMounted(true), []);
 
   // Load filter values once
   useEffect(() => {
@@ -93,14 +90,6 @@ export default function Home() {
 
   const totalPages = Math.ceil(totalCount / PER_PAGE);
   const currentPage = filters.page || 1;
-
-  if (!mounted) {
-    return (
-      <div className="container" style={{ textAlign: "center", paddingTop: "100px", color: "#888" }}>
-        Carregando...
-      </div>
-    );
-  }
 
   return (
     <div className="container">

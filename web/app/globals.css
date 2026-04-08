@@ -168,6 +168,71 @@ body {
   background: var(--color-dark);
 }
 
+.tree-branch {
+  border-radius: 10px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  margin-bottom: 5px;
+  overflow: hidden;
+}
+
+.tree-branch[open] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 16px rgba(0, 212, 170, 0.08);
+}
+
+.tree-summary {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #fff;
+}
+
+.tree-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tree-chevron {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 6px;
+  background: rgba(0, 212, 170, 0.12);
+  display: grid;
+  place-items: center;
+}
+
+.tree-chevron::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid var(--color-accent);
+  border-bottom: 2px solid var(--color-accent);
+  transform: rotate(-45deg);
+  margin-top: -2px;
+  transition: transform 0.2s ease;
+}
+
+.tree-branch[open] > .tree-summary .tree-chevron::after {
+  transform: rotate(45deg);
+  margin-top: 0;
+}
+
+.tree-children {
+  padding: 4px 8px 10px 14px;
+  border-top: 1px solid var(--color-border);
+  border-left: 3px solid rgba(0, 212, 170, 0.35);
+  margin: 0 0 6px 10px;
+  border-radius: 0 0 0 8px;
+  background: linear-gradient(90deg, rgba(0, 212, 170, 0.06), transparent);
+}
+
 .tree-leaf {
   padding: 5px 6px;
   border-radius: 8px;

@@ -32,11 +32,18 @@ export interface Question {
 
 export interface FilterValues {
   specialties: string[];
+  topicsTree?: TopicNode[];
   institutions: string[];
   years: number[];
   finalidades: string[];
   bancas: string[];
   regions: string[];
+}
+
+export interface TopicNode {
+  name: string;
+  path: string;
+  children: TopicNode[];
 }
 
 export interface Filters {

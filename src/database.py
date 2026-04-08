@@ -57,6 +57,16 @@ def create_db(db_path: str = DB_PATH) -> sqlite3.Connection:
             name TEXT PRIMARY KEY
         );
 
+        CREATE TABLE topics (
+            path TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            parent_path TEXT,
+            depth INTEGER NOT NULL
+        );
+
+        CREATE INDEX idx_topics_parent ON topics(parent_path);
+        CREATE INDEX idx_topics_depth ON topics(depth);
+
         CREATE INDEX idx_q_type ON questions(answer_type);
         CREATE INDEX idx_q_year ON questions(year);
         CREATE INDEX idx_q_institution ON questions(institution);
@@ -169,16 +179,27 @@ def build_from_jsonl(jsonl_path: str, db_path: str = DB_PATH) -> int:
     print(f"\n  Extraindo especialidades...")
     rows = conn.execute("SELECT DISTINCT topics FROM questions WHERE topics != '[]'").fetchall()
     specs = set()
+    topic_rows = []
     for r in rows:
         try:
             for t in json.loads(r[0]):
                 name = (t.get("n") or "").strip()
+                path = (t.get("p") or "").strip()
                 if name:
                     specs.add(name)
+                if name and path:
+                    depth = path.count("[$$]")
+                    parent = path.rsplit("[$$]", 1)[0] if "[$$]" in path else None
+                    topic_rows.append((path, name, parent, depth))
         except json.JSONDecodeError:
             pass
     for name in specs:
         conn.execute("INSERT OR IGNORE INTO specialties (name) VALUES (?)", (name,))
+    if topic_rows:
+        conn.executemany(
+            "INSERT OR IGNORE INTO topics (path, name, parent_path, depth) VALUES (?,?,?,?)",
+            topic_rows,
+        )
     conn.commit()
     print(f"  {len(specs)} especialidades inseridas.")
 
