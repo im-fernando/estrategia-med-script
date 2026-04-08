@@ -167,28 +167,43 @@ def fetch_all_questions(
     seen_ids = {q.get("id") for q in cached if q.get("id")}
     questions = list(cached)
 
-    start_page = (len(cached) // PER_PAGE) + 1 if cached else 1
-    if start_page > pages_estimate and cached:
+    if cached and len(cached) >= total:
         print("Todas as questoes ja estao no cache.")
         return questions
 
-    print(f"\nBaixando questoes (pagina {start_page} a {pages_estimate})...")
+    print(f"\nBaixando questoes...")
 
+    # Carregar token de paginacao do cache se existir
+    token_file = CACHE_FILE.replace(".json", "_token.txt")
+    next_token = None
+    if cached and os.path.exists(token_file):
+        with open(token_file, "r") as f:
+            next_token = f.read().strip() or None
+        if next_token:
+            print(f"Retomando do token de paginacao salvo...")
+
+    page = 1
     with tqdm(total=total, initial=len(cached), unit="q") as pbar:
-        page = start_page
         while True:
             try:
                 payload = {"filters": filters_no_topic}
+                params = {
+                    "perPage": PER_PAGE,
+                    "order": "ASC",
+                    "sort": "key_pedagogical_order",
+                }
+
+                # Usar token pagination apos 10k resultados
+                if next_token:
+                    params["token"] = next_token
+                else:
+                    params["page"] = page
+
                 data = post(
                     session,
                     "/bff/questions/search",
                     json_data=payload,
-                    params={
-                        "page": page,
-                        "perPage": PER_PAGE,
-                        "order": "ASC",
-                        "sort": "key_pedagogical_order",
-                    },
+                    params=params,
                 )
 
                 raw = data.get("data", [])
@@ -207,8 +222,16 @@ def fetch_all_questions(
 
                 pbar.update(new_count)
 
+                # Extrair next token para proxima pagina
+                token_pag = data.get("token_pagination", {})
+                next_token = token_pag.get("next_page_token", None) if isinstance(token_pag, dict) else None
+
+                # Salvar cache periodicamente
                 if page % 10 == 0:
                     save_cache(questions)
+                    if next_token:
+                        with open(token_file, "w") as f:
+                            f.write(next_token)
 
                 if len(page_questions) < PER_PAGE:
                     break
@@ -218,6 +241,9 @@ def fetch_all_questions(
             except Exception as e:
                 print(f"\nErro na pagina {page}: {e}")
                 save_cache(questions)
+                if next_token:
+                    with open(token_file, "w") as f:
+                        f.write(next_token)
                 print("Cache salvo. Voce pode retomar depois.")
                 raise
 
