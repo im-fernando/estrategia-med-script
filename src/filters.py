@@ -1,6 +1,35 @@
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
+
 import requests
 
-from src.api_client import get
+from src.api_client import BASE_URL
+
+
+# Rate limiter compartilhado entre threads
+_rate_lock = Lock()
+_last_request = [0.0]
+MIN_INTERVAL = 0.05  # 50ms entre requests (rapido mas seguro)
+
+
+def _rate_limited_get(session: requests.Session, path: str, params: dict = None) -> dict:
+    """GET com rate limiting thread-safe."""
+    url = f"{BASE_URL}{path}" if path.startswith("/") else path
+    with _rate_lock:
+        elapsed = time.time() - _last_request[0]
+        if elapsed < MIN_INTERVAL:
+            time.sleep(MIN_INTERVAL - elapsed)
+        _last_request[0] = time.time()
+    resp = session.get(url, params=params)
+    if not resp.ok:
+        try:
+            err = resp.json()
+        except Exception:
+            err = resp.text
+        print(f"  GET {path} -> {resp.status_code}: {err}")
+    resp.raise_for_status()
+    return resp.json()
 
 
 def fetch_classifications(session: requests.Session, parent_id: str, per_page: int = 100) -> list[dict]:
@@ -9,7 +38,7 @@ def fetch_classifications(session: requests.Session, parent_id: str, per_page: i
     page = 1
 
     while True:
-        data = get(
+        data = _rate_limited_get(
             session,
             f"/bff/questions/filters/classifications/{parent_id}",
             params={"page": page, "per_page": per_page},
@@ -32,83 +61,128 @@ def fetch_classifications(session: requests.Session, parent_id: str, per_page: i
     return all_items
 
 
-def fetch_classifications_recursive(
-    session: requests.Session,
-    parent_id: str,
-    depth: int = 0,
-    max_depth: int = 10,
-) -> list[dict]:
-    """Busca classificacoes recursivamente, descendo em items com has_children=True."""
-    if depth >= max_depth:
+def _fetch_children(session: requests.Session, item: dict, depth: int, max_depth: int) -> list[dict]:
+    """Busca filhos de um item e retorna lista flat com depth."""
+    if depth >= max_depth or not item.get("has_children") or not item.get("id"):
         return []
 
-    items = fetch_classifications(session, parent_id)
+    children = fetch_classifications(session, item["id"])
+    results = []
+    parent_id = item.get("id")
+    for child in children:
+        child["_depth"] = depth
+        if parent_id:
+            child["_parent_id"] = parent_id
+        results.append(child)
+    return results
+
+
+def fetch_tree_parallel(
+    session: requests.Session,
+    root_items: list[dict],
+    root_depth: int = 1,
+    max_depth: int = 10,
+    max_workers: int = 8,
+) -> list[dict]:
+    """Busca arvore de classificacoes em paralelo usando BFS por nivel."""
     all_items = []
 
-    for item in items:
-        item["_depth"] = depth
-        all_items.append(item)
+    # Fila: itens cujos filhos precisamos buscar
+    pending = [(item, root_depth) for item in root_items if item.get("has_children")]
 
-        if item.get("has_children"):
-            children = fetch_classifications_recursive(
-                session, item["id"], depth + 1, max_depth
-            )
-            all_items.extend(children)
+    while pending:
+        next_pending = []
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            future_map = {}
+            for item, depth in pending:
+                if depth >= max_depth:
+                    continue
+                fut = pool.submit(_fetch_children, session, item, depth, max_depth)
+                future_map[fut] = (item, depth)
+
+            for fut in as_completed(future_map):
+                item, depth = future_map[fut]
+                try:
+                    children = fut.result()
+                    all_items.extend(children)
+                    # Agendar filhos que tambem tem children
+                    for child in children:
+                        if child.get("has_children"):
+                            next_pending.append((child, depth + 1))
+                except Exception:
+                    pass
+
+        pending = next_pending
 
     return all_items
 
 
-def fetch_topics(session: requests.Session) -> list[dict]:
-    """Busca lista de especialidades/assuntos (nivel raiz)."""
-    data = get(session, "/questions/topics")
-    return data.get("data", data) if isinstance(data, dict) else data
+def fetch_topics_full_tree(session: requests.Session, topic_catalog_id: str) -> list[dict]:
+    """Busca arvore completa de topicos em paralelo."""
+    from src.api_client import get
 
+    print(f"    Buscando topicos raiz...")
+    try:
+        data = get(session, "/bff/questions/topics")
+        root_topics = data.get("data", data) if isinstance(data, dict) else data
+        if not isinstance(root_topics, list):
+            root_topics = []
+    except Exception:
+        root_topics = fetch_classifications(session, topic_catalog_id)
+    print(f"    {len(root_topics)} especialidades raiz encontradas.")
 
-def fetch_topics_full_tree(session: requests.Session, topics: list[dict]) -> list[dict]:
-    """Busca arvore completa de topicos com todos os subtopicos."""
-    all_topics = []
+    # Marcar depth 0
+    for t in root_topics:
+        t["_depth"] = 0
 
-    for topic in topics:
-        topic["_depth"] = 0
-        all_topics.append(topic)
+    # Buscar subtopicos em paralelo
+    print(f"    Buscando subtopicos em paralelo (8 threads)...")
+    subtopics = fetch_tree_parallel(session, root_topics, root_depth=1, max_workers=8)
+    print(f"    {len(subtopics)} subtopicos encontrados.")
 
-        topic_id = topic.get("id", "")
-        if not topic_id:
-            continue
-
-        print(f"    Buscando subtopicos de {topic.get('name', topic_id)}...")
-        try:
-            children = fetch_classifications_recursive(session, topic_id, depth=1)
-            all_topics.extend(children)
-            if children:
-                print(f"      {len(children)} subtopicos encontrados.")
-        except Exception as e:
-            print(f"      Aviso: erro ao buscar subtopicos: {e}")
-
-    return all_topics
+    return root_topics + subtopics
 
 
 def fetch_catalog_options(session: requests.Session, catalog_id: str) -> list[dict]:
-    """Busca todas as opcoes de um catalogo paginado (instituicao, banca, finalidade)."""
+    """Busca todas as opcoes de um catalogo paginado."""
     return fetch_classifications(session, catalog_id)
 
 
 def fetch_teachers(session: requests.Session) -> list[dict]:
     """Busca lista de professores."""
-    data = get(session, "/questions/filters/teacher")
+    from src.api_client import get
+    data = get(session, "/bff/questions/filters/teacher")
     return data.get("data", data) if isinstance(data, dict) else data
 
 
-def fetch_regions(session: requests.Session) -> dict:
-    """Busca regioes (estados e municipios)."""
-    regions = {}
+def fetch_regions(session: requests.Session) -> list[dict]:
+    """Busca regioes com subregioes em paralelo."""
+    from src.api_client import get
+
+    all_regions = []
     for region_type in ["STATE", "MUNICIPAL", "TYPES"]:
         try:
-            data = get(session, f"/questions/filters/region/{region_type}")
-            regions[region_type] = data.get("data", data) if isinstance(data, dict) else data
+            data = get(session, f"/bff/questions/filters/region/{region_type}")
+            items = data.get("data", data) if isinstance(data, dict) else data
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                item["_depth"] = 0
+                item["_region_type"] = region_type
+                all_regions.append(item)
         except Exception:
-            regions[region_type] = []
-    return regions
+            pass
+
+    # Buscar subregioes em paralelo
+    items_with_children = [r for r in all_regions if r.get("has_children")]
+    if items_with_children:
+        sub = fetch_tree_parallel(session, items_with_children, root_depth=1, max_workers=4)
+        for s in sub:
+            s["_region_type"] = s.get("_region_type", "")
+        all_regions.extend(sub)
+
+    return all_regions
 
 
 def generate_years(start: int = 2003, end: int = 2026) -> list[int]:
@@ -117,14 +191,27 @@ def generate_years(start: int = 2003, end: int = 2026) -> list[int]:
 
 
 def fetch_all_filter_options(session: requests.Session, catalogs: list[dict]) -> dict:
-    """Busca todas as opcoes de filtro disponíveis."""
+    """Busca todas as opcoes de filtro disponiveis."""
+    from src.api_client import get
     options = {}
 
-    print("  Buscando especialidades/assuntos...")
-    root_topics = fetch_topics(session)
-    print(f"    {len(root_topics)} especialidades raiz encontradas.")
-    print("  Buscando arvore completa de subtopicos (pode demorar)...")
-    options["topics"] = fetch_topics_full_tree(session, root_topics)
+    topic_catalog_id = None
+    for catalog in catalogs:
+        if catalog.get("key") == "topic":
+            topic_catalog_id = catalog.get("id")
+            break
+
+    if topic_catalog_id:
+        print("  Buscando especialidades/assuntos (arvore completa, paralelo)...")
+        try:
+            options["topics"] = fetch_topics_full_tree(session, topic_catalog_id)
+            print(f"    Total: {len(options['topics'])} topicos/subtopicos.")
+        except Exception as e:
+            print(f"    Aviso: erro ao buscar topicos: {e}")
+            options["topics"] = []
+    else:
+        print("  Aviso: catalog de topicos nao encontrado na config.")
+        options["topics"] = []
 
     print("  Buscando anos...")
     options["years"] = generate_years()
@@ -136,12 +223,13 @@ def fetch_all_filter_options(session: requests.Session, catalogs: list[dict]) ->
         print(f"    Aviso: nao foi possivel buscar professores: {e}")
         options["teachers"] = []
 
-    print("  Buscando regioes...")
+    print("  Buscando regioes (com subregioes)...")
     try:
         options["regions"] = fetch_regions(session)
+        print(f"    {len(options['regions'])} regioes encontradas.")
     except Exception as e:
         print(f"    Aviso: nao foi possivel buscar regioes: {e}")
-        options["regions"] = {}
+        options["regions"] = []
 
     for catalog in catalogs:
         key = catalog.get("key", "")
@@ -150,7 +238,7 @@ def fetch_all_filter_options(session: requests.Session, catalogs: list[dict]) ->
         catalog_id = catalog.get("id", "")
 
         if origin == "catalogs" and catalog_id:
-            print(f"  Buscando {name} ({catalog_id})...")
+            print(f"  Buscando {name}...")
             try:
                 options[key] = fetch_catalog_options(session, catalog_id)
                 print(f"    Encontrados {len(options[key])} itens.")

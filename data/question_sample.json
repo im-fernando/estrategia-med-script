@@ -1,0 +1,238 @@
+{
+  "id": "4000000064",
+  "exams": [
+    {
+      "id": "4000000074",
+      "scholarity": "placeholder",
+      "year": 2018,
+      "catalogs": {
+        "4383bd62-e829-491e-8bb5-b40bd649817f": {
+          "id": "42bcdb35-c6b9-4ff2-bac0-2d2fa575f042",
+          "name": "Residência (Acesso Direto)"
+        },
+        "5d401e50-47cf-4d06-9a2f-19997cd0f258": {
+          "id": "4bc36cd6-7d4c-4b2a-967e-78a854b504b9",
+          "name": "Não se aplica"
+        },
+        "63b07b3e-c200-4b3d-b9e6-742a096ae26e": {
+          "id": "bed775aa-f660-4b68-a735-c82f49cfa04b",
+          "name": "AC - Hospital Oftalmológico do Acre - HOA"
+        },
+        "75851bb5-e834-49af-affe-50e954c40801": {
+          "id": "55402575-a6ef-41f1-a190-9ecdce1af36b",
+          "name": "Não se aplica"
+        },
+        "7930032c-3d1b-4a19-a8c8-12bb8137e59a": {
+          "id": "cad77a08-2520-453c-bb37-b023d5161d6d",
+          "name": "Não se aplica"
+        },
+        "8ff170f3-13a5-4421-8474-4e39649c523f": {
+          "id": "c0fb2a79-d5f3-4686-8eb4-078b329da379",
+          "name": "Não se aplica"
+        },
+        "9f5ce998-c2c4-47ed-81d3-a9042f54cc33": {
+          "id": "b35c6fce-73ec-4b54-aae8-ad664a219e03",
+          "name": "Privado"
+        },
+        "f99244db-58aa-4669-bb7e-4216d75b733d": {
+          "id": "af7e85c2-2c30-4a9a-ba79-8caf9d22e744",
+          "name": "Acesso Direto (R1)"
+        }
+      },
+      "number": 1,
+      "complement": "",
+      "remuneration": 0,
+      "open_spaces": 0,
+      "candidates_number": 0,
+      "accepted_candidates_number": 0,
+      "answers_type": "MULTIPLE_CHOICE",
+      "active": true,
+      "degree_proof": false,
+      "questions_number": 100,
+      "created_at": "2020-09-02T19:34:25Z",
+      "badges": [
+        {
+          "type": "63b07b3e-c200-4b3d-b9e6-742a096ae26e",
+          "text": "AC - Hospital Oftalmológico do Acre - HOA"
+        },
+        {
+          "type": "YEAR",
+          "text": "2018"
+        },
+        {
+          "type": "4383bd62-e829-491e-8bb5-b40bd649817f",
+          "text": "Residência (Acesso Direto)"
+        }
+      ]
+    }
+  ],
+  "topics": [
+    {
+      "id": "c6fe89b8-22b4-4413-9648-3e214e0df60b",
+      "name": "Cirurgia",
+      "created_at": "2025-03-14T19:20:33Z",
+      "is_master": true,
+      "is_main_classification": true,
+      "path": "Cirurgia",
+      "path_id": [
+        "5d4b4db2-40fe-4a1d-9f59-43640749deb5",
+        "c6fe89b8-22b4-4413-9648-3e214e0df60b"
+      ],
+      "has_children": false,
+      "nodes": null
+    }
+  ],
+  "alternatives": [
+    {
+      "id": "039fb45d-a267-4740-a539-1930d8e02da2",
+      "position": "0",
+      "body": "A calorimetria indireta é o método de referência para o cálculo do gasto energético.",
+      "body_json": null,
+      "sanitized_body": "A calorimetria indireta é o método de referência para o cálculo do gasto energético.",
+      "correct": false,
+      "created_at": "2020-09-09T12:55:55Z",
+      "updated_at": "2026-04-07T00:31:32Z",
+      "topics": [],
+      "solution": {
+        "complete": "",
+        "complete_json": null,
+        "sanitized_complete": "",
+        "complete_attachments": null,
+        "brief": "",
+        "brief_json": null,
+        "sanitized_brief": "",
+        "brief_attachments": null,
+        "author_profile": null
+      },
+      "answer_percentage": 8,
+      "answers": 165
+    },
+    {
+      "id": "e9a68cb1-0204-40cf-a1d6-db3c2c184717",
+      "position": "1",
+      "body": "O gasto energético diário, usualmente, está em torno de 20 a 30 K cal/kg (do peso habitual).",
+      "body_json": null,
+      "sanitized_body": "O gasto energético diário, usualmente, está em torno de 20 a 30 K cal/kg (do peso habitual).",
+      "correct": false,
+      "created_at": "2020-09-09T12:55:55Z",
+      "updated_at": "2026-04-06T23:12:42Z",
+      "topics": [],
+      "solution": {
+        "complete": "",
+        "complete_json": null,
+        "sanitized_complete": "",
+        "complete_attachments": null,
+        "brief": "",
+        "brief_json": null,
+        "sanitized_brief": "",
+        "brief_attachments": null,
+        "author_profile": null
+      },
+      "answer_percentage": 10,
+      "answers": 186
+    },
+    {
+      "id": "abf0783e-1d4f-4def-9964-89f718c41c89",
+      "position": "2",
+      "body": "A elevação das catecolaminas, no paciente crítico, favorece a gliconeogênese e a glicogenólise.&nbsp;",
+      "body_json": null,
+      "sanitized_body": "A elevação das catecolaminas, no paciente crítico, favorece a gliconeogênese e a glicogenólise. ",
+      "correct": false,
+      "created_at": "2020-09-09T12:55:55Z",
+      "updated_at": "2026-04-06T00:43:48Z",
+      "topics": [],
+      "solution": {
+        "complete": "",
+        "complete_json": null,
+        "sanitized_complete": "",
+        "complete_attachments": null,
+        "brief": "",
+        "brief_json": null,
+        "sanitized_brief": "",
+        "brief_attachments": null,
+        "author_profile": null
+      },
+      "answer_percentage": 9,
+      "answers": 182
+    },
+    {
+      "id": "b1e7fa7d-0fe8-41ee-a151-1d51ebebaca3",
+      "position": "3",
+      "body": "Observa-se diminuição da captação hepática de glicose (resistência central à insulina) e periférica (resistência periférica à insulina).",
+      "body_json": null,
+      "sanitized_body": "Observa-se diminuição da captação hepática de glicose (resistência central à insulina) e periférica (resistência periférica à insulina).",
+      "correct": false,
+      "created_at": "2020-09-09T12:55:55Z",
+      "updated_at": "2026-04-08T00:03:14Z",
+      "topics": [],
+      "solution": {
+        "complete": "",
+        "complete_json": null,
+        "sanitized_complete": "",
+        "complete_attachments": null,
+        "brief": "",
+        "brief_json": null,
+        "sanitized_brief": "",
+        "brief_attachments": null,
+        "author_profile": null
+      },
+      "answer_percentage": 11,
+      "answers": 214
+    },
+    {
+      "id": "3a69a44f-3753-4c4f-9b12-8c6938fdb237",
+      "position": "4",
+      "body": "A promoção da hiperalimentação no paciente com sepse melhora o prognóstico, haja vista o seu estado hipermetabólico.",
+      "body_json": null,
+      "sanitized_body": "A promoção da hiperalimentação no paciente com sepse melhora o prognóstico, haja vista o seu estado hipermetabólico.",
+      "correct": true,
+      "created_at": "2020-09-09T12:55:55Z",
+      "updated_at": "2026-04-07T22:22:01Z",
+      "topics": [],
+      "solution": {
+        "complete": "",
+        "complete_json": null,
+        "sanitized_complete": "",
+        "complete_attachments": null,
+        "brief": "",
+        "brief_json": null,
+        "sanitized_brief": "",
+        "brief_attachments": null,
+        "author_profile": null
+      },
+      "answer_percentage": 62,
+      "answers": 1198
+    }
+  ],
+  "answer_type": "MULTIPLE_CHOICE",
+  "statement": "Com relação ao suporte nutricional no paciente grave, é INCORRETO afirmar:",
+  "statement_text": "Com relação ao suporte nutricional no paciente grave, é INCORRETO afirmar:",
+  "labels": [
+    "FINAL_ANSWER_SHEET"
+  ],
+  "created_at": "2020-09-09T12:55:55Z",
+  "forum_id": "ef317abf-0bfa-4d4c-93a4-c0fc9e3d93a9",
+  "solution": {
+    "complete": "",
+    "complete_json": null,
+    "sanitized_complete": "",
+    "complete_attachments": null,
+    "brief": "",
+    "brief_json": null,
+    "sanitized_brief": "",
+    "brief_attachments": null,
+    "author_profile": null
+  },
+  "status": {
+    "value": "APPROVED"
+  },
+  "has_video_solution": false,
+  "solution_video_url": "",
+  "unlisted": false,
+  "slug": "Com-suporte1108abe750",
+  "public": true,
+  "solution_video_resolutions": null,
+  "has_support_text": false,
+  "body_support_html": "",
+  "body_support_json": null
+}

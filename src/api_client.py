@@ -44,14 +44,26 @@ def get(session: requests.Session, path: str, params: dict = None) -> dict:
     url = f"{BASE_URL}{path}" if path.startswith("/") else path
     time.sleep(REQUEST_DELAY)
     resp = session.get(url, params=params)
+    if not resp.ok:
+        try:
+            err = resp.json()
+        except Exception:
+            err = resp.text
+        print(f"  GET {path} -> {resp.status_code}: {err}")
     resp.raise_for_status()
     return resp.json()
 
 
-def post(session: requests.Session, path: str, json_data: dict = None, params: dict = None) -> dict:
+def post(session: requests.Session, path: str, json_data=None, params: dict = None) -> dict:
     """POST request com rate limiting."""
     url = f"{BASE_URL}{path}" if path.startswith("/") else path
     time.sleep(REQUEST_DELAY)
     resp = session.post(url, json=json_data, params=params)
+    if not resp.ok:
+        try:
+            err = resp.json()
+        except Exception:
+            err = resp.text
+        print(f"  POST {path} -> {resp.status_code}: {err}")
     resp.raise_for_status()
     return resp.json()
