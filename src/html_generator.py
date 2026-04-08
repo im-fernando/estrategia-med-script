@@ -114,20 +114,17 @@ def _specialty_filter_markup(topics_tree: list[dict], specialty_names_fallback: 
     return f'<div id="filter-specialty-tree" class="tree-filter-scroll" role="group" aria-label="Especialidades">{opts}</div>'
 
 
-def _region_filter_markup(regions_tree: list[dict], region_names_fallback: list[str]) -> str:
-    if regions_tree and isinstance(regions_tree, list):
-        if _flat_has_parent_links(regions_tree):
-            nested = _build_nested_tree(regions_tree)
-            _sort_tree_nodes(nested)
-            body = _render_tree_accordion(nested, "filter-region-cb")
-        else:
-            body = _render_flat_topic_checkboxes(regions_tree, "filter-region-cb")
-        return f'<div id="filter-region-tree" class="tree-filter-scroll" role="group" aria-label="Regioes">{body}</div>'
+def _region_filter_markup(region_items: list[dict], region_codes_fallback: list[str]) -> str:
+    """Gera checkboxes de regiao. Cada item tem 'code' (sigla UF) e 'name' (ex: 'AC - Acre')."""
+    items = region_items
+    if not items:
+        items = [{"code": c, "name": c} for c in region_codes_fallback]
 
     opts = "".join(
         f'<div class="tree-leaf"><label class="tree-label"><input type="checkbox" class="filter-region-cb" '
-        f'value="{_escape(r)}" onchange="applyFilters()"><span class="tree-name">{_escape(r)}</span></label></div>'
-        for r in region_names_fallback
+        f'value="{_escape(r.get("code", r.get("name", "")))}" onchange="applyFilters()">'
+        f'<span class="tree-name">{_escape(r.get("name", r.get("code", "")))}</span></label></div>'
+        for r in items
     )
     return f'<div id="filter-region-tree" class="tree-filter-scroll" role="group" aria-label="Regioes">{opts}</div>'
 
@@ -173,6 +170,9 @@ def _extract_filter_values(questions: list[dict]) -> dict:
         inst = _catalog_name(exam, CATALOG_INSTITUTION)
         if inst:
             values["institutions"].add(inst)
+            # Extrair estado da sigla no nome (ex: "PR - Hospital..." -> "PR")
+            if len(inst) >= 2 and inst[2:3] in (" ", "-"):
+                values["regions"].add(inst[:2])
 
         year = exam.get("year")
         if year:
@@ -247,7 +247,10 @@ def _render_question(q: dict, idx: int) -> str:
     answer_type = q.get("answer_type", "")
     answer_type_label = _answer_type_label(answer_type)
 
-    region_name = ""  # Regioes nao vem na questao diretamente
+    # Extrair estado da sigla da instituicao (ex: "PR - Hospital..." -> "PR")
+    region_name = ""
+    if inst_name and len(inst_name) >= 2 and inst_name[2:3] in (" ", "-"):
+        region_name = inst_name[:2]
 
     statement = q.get("statement", "") or ""
     if not statement:
@@ -403,8 +406,23 @@ def generate_html(questions: list[dict], filter_options: dict, output_path: str 
         f'<option value="{_escape(s)}">{_escape(s)}</option>' for s in fv["jurys"]
     )
 
-    regions_tree = filter_options.get("regions", [])
-    region_filter_html = _region_filter_markup(regions_tree if isinstance(regions_tree, list) else [], fv["regions"])
+    # Regioes: extrair estados unicos do S3 locations + das questoes
+    regions_data = filter_options.get("regions", [])
+    state_names = {}
+    if isinstance(regions_data, list):
+        for loc in regions_data:
+            if loc.get("type") == "STATE" and loc.get("code") and loc.get("state"):
+                state_names[loc["code"]] = loc["state"]
+
+    # Combinar com estados extraidos das questoes (fallback)
+    all_states = set(fv.get("regions", []))
+    # Criar lista de estados com nome completo
+    region_items = []
+    for code in sorted(all_states | set(state_names.keys())):
+        full_name = state_names.get(code, code)
+        region_items.append({"name": f"{code} - {full_name}" if full_name != code else code, "_depth": 0, "code": code})
+
+    region_filter_html = _region_filter_markup(region_items if region_items else [], list(fv.get("regions", [])))
 
     questions_html = ""
     for i, q in enumerate(questions):
