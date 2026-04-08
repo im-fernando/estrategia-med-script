@@ -114,18 +114,13 @@ def main():
         # Modo teste: questoes ja na memoria
         generate_html(questions, filter_options, output)
     else:
-        # Modo completo: ler do JSONL em streaming
-        from src.questions import CACHE_FILE, load_cache
+        # Modo completo: gerar em streaming do JSONL
+        from src.questions import CACHE_FILE
+        from src.html_generator import generate_html_streaming
         if not os.path.exists(CACHE_FILE):
             print("Nenhuma questao disponivel.")
             sys.exit(1)
-        print(f"Carregando questoes do cache ({CACHE_FILE})...")
-        questions = load_cache()
-        if not questions:
-            print("Nenhuma questao disponivel.")
-            sys.exit(1)
-        print(f"  {len(questions)} questoes carregadas.")
-        generate_html(questions, filter_options, output)
+        generate_html_streaming(CACHE_FILE, filter_options, output)
 
     print(f"\nConcluido! Abra o arquivo '{output}' no navegador.")
 

@@ -1439,3 +1439,429 @@ applyFilters();
 
     size_mb = os.path.getsize(output_path) / (1024 * 1024)
     print(f"HTML gerado: {output_path} ({size_mb:.1f} MB)")
+
+
+def _compact_question(q: dict) -> dict:
+    """Extrai campos essenciais de uma questao pra JSON compacto."""
+    exam = _exam_data(q)
+    inst = _catalog_name(exam, CATALOG_INSTITUTION)
+    banca = _catalog_name(exam, CATALOG_BANCA)
+    finalidade = _catalog_name(exam, CATALOG_FINALIDADE)
+    year = exam.get("year", "")
+
+    # Região da sigla da instituicao
+    region = ""
+    if inst and len(inst) >= 2 and inst[2:3] in (" ", "-"):
+        region = inst[:2]
+
+    # Topicos
+    topics = []
+    for t in q.get("topics", []):
+        name = t.get("name", "")
+        path = t.get("path", "")
+        if name:
+            topics.append({"n": name, "p": path})
+
+    # Alternativas compactas
+    alts = []
+    correct_pos = -1
+    for a in q.get("alternatives", []):
+        if not isinstance(a, dict):
+            continue
+        pos = int(a.get("position", 0))
+        alts.append({
+            "l": chr(65 + pos),
+            "b": a.get("body", ""),
+            "c": a.get("correct", False),
+            "pct": a.get("answer_percentage", 0),
+        })
+        if a.get("correct"):
+            correct_pos = pos
+
+    # Solucao
+    sol = q.get("solution", {})
+    sol_text = ""
+    if isinstance(sol, dict):
+        sol_text = sol.get("complete", "") or sol.get("brief", "")
+
+    return {
+        "id": q.get("id", ""),
+        "st": q.get("statement", ""),  # enunciado HTML
+        "tp": q.get("answer_type", ""),
+        "yr": year,
+        "in": inst,
+        "bk": banca,
+        "fn": finalidade,
+        "rg": region,
+        "lb": q.get("labels", []),
+        "to": topics,
+        "al": alts,
+        "cr": chr(65 + correct_pos) if correct_pos >= 0 else "",
+        "sl": sol_text,
+        "hv": q.get("has_video_solution", False),
+        "vu": q.get("solution_video_url", "") or "",
+    }
+
+
+def generate_html_streaming(jsonl_path: str, filter_options: dict, output_path: str = "questoes.html"):
+    """Gera HTML lendo JSONL em streaming. Nao carrega tudo na RAM.
+
+    Estrategia:
+    1. Le JSONL linha por linha, extrai versao compacta de cada questao
+    2. Escreve um arquivo JSON separado (questoes_data.js)
+    3. Gera HTML leve que carrega o JS e renderiza sob demanda
+    """
+    import sys
+
+    data_path = output_path.replace(".html", "_data.js")
+    print(f"Processando questoes de {jsonl_path}...")
+
+    # Passada unica: extrair questoes compactas + valores de filtro
+    filter_vals = {
+        "specialties": set(), "institutions": set(), "years": set(),
+        "answer_types": set(), "jurys": set(), "finalidades": set(), "regions": set(),
+    }
+
+    count = 0
+    with open(data_path, "w", encoding="utf-8") as df:
+        df.write("const Q=[\n")
+        with open(jsonl_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    q = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                cq = _compact_question(q)
+
+                # Coletar valores de filtro
+                for t in cq["to"]:
+                    if t["n"]:
+                        filter_vals["specialties"].add(t["n"])
+                if cq["in"]:
+                    filter_vals["institutions"].add(cq["in"])
+                if cq["yr"]:
+                    filter_vals["years"].add(str(cq["yr"]))
+                if cq["tp"]:
+                    filter_vals["answer_types"].add(cq["tp"])
+                if cq["bk"]:
+                    filter_vals["jurys"].add(cq["bk"])
+                if cq["fn"]:
+                    filter_vals["finalidades"].add(cq["fn"])
+                if cq["rg"]:
+                    filter_vals["regions"].add(cq["rg"])
+
+                if count > 0:
+                    df.write(",\n")
+                df.write(json.dumps(cq, ensure_ascii=False, separators=(",", ":")))
+                count += 1
+
+                if count % 10000 == 0:
+                    print(f"  {count} questoes processadas...", end="\r")
+
+        df.write("\n];\n")
+
+    data_size = os.path.getsize(data_path) / (1024 * 1024)
+    print(f"  {count} questoes processadas -> {data_path} ({data_size:.1f} MB)")
+
+    # Opcoes de filtro dos filter_options (completas) ou das questoes
+    inst_names = sorted({item["name"] for item in filter_options.get("institution_id", []) if item.get("name")}) or sorted(filter_vals["institutions"])
+    banca_names = sorted({item["name"] for item in filter_options.get("jury_id", []) if item.get("name")}) or sorted(filter_vals["jurys"])
+    finalidade_names = sorted({item["name"] for item in filter_options.get("goal_id", []) if item.get("name")}) or sorted(filter_vals["finalidades"])
+
+    # Regioes do S3
+    regions_data = filter_options.get("regions", [])
+    state_names = {}
+    if isinstance(regions_data, list):
+        for loc in regions_data:
+            if loc.get("type") == "STATE" and loc.get("code") and loc.get("state"):
+                state_names[loc["code"]] = loc["state"]
+    all_states = sorted(filter_vals["regions"] | set(state_names.keys()))
+    region_opts = [{"code": c, "label": f"{c} - {state_names.get(c, c)}"} for c in all_states]
+
+    def _opts(items):
+        return json.dumps(sorted(items), ensure_ascii=False)
+
+    data_filename = os.path.basename(data_path)
+
+    page_html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estrategia Med — {count} Questoes</title>
+<style>
+:root {{--p:#2563eb;--pd:#1d4ed8;--pl:#dbeafe;--ok:#16a34a;--okl:#dcfce7;--okb:#86efac;--err:#dc2626;--errl:#fee2e2;--errb:#fca5a5;--w:#f59e0b;--wl:#fef3c7;--g1:#f9fafb;--g2:#e5e7eb;--g3:#d1d5db;--g5:#6b7280;--g7:#374151;--g8:#1f2937;--r:10px;}}
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--g1);color:var(--g8);line-height:1.5}}
+.wrap{{display:flex;min-height:100vh}}
+.side{{width:340px;background:#fff;padding:20px;border-right:1px solid var(--g2);position:fixed;top:0;left:0;bottom:0;overflow-y:auto;z-index:10}}
+.main{{margin-left:340px;padding:24px;flex:1;max-width:960px}}
+.side h2{{font-size:18px;font-weight:700;color:var(--g8);margin-bottom:12px}}
+.stats{{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}}
+.st{{flex:1;min-width:70px;text-align:center;padding:8px 4px;border-radius:var(--r);font-size:11px;font-weight:500}}
+.st b{{font-size:18px;display:block}}.st-t{{background:var(--pl);color:var(--pd)}}.st-c{{background:var(--okl);color:var(--ok)}}.st-w{{background:var(--errl);color:var(--err)}}
+.fg{{margin-bottom:12px}}.fg label{{display:block;font-weight:600;font-size:12px;color:var(--g5);margin-bottom:4px}}
+.fg input[type=text]{{width:100%;padding:8px;border:1px solid var(--g3);border-radius:8px;font-size:13px}}
+.fscroll{{max-height:160px;overflow-y:auto;border:1px solid var(--g2);border-radius:8px;padding:6px}}
+.fscroll label{{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g7);padding:2px 0;cursor:pointer}}
+.fscroll input{{accent-color:var(--p);width:14px;height:14px}}
+.cbg{{display:flex;flex-direction:column;gap:3px}}.cbg label{{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}}
+.cbg input{{accent-color:var(--p);width:15px;height:15px}}
+details summary{{font-size:12px;font-weight:600;color:var(--g5);cursor:pointer;padding:6px 0;user-select:none}}
+.btn{{border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}}
+.btn-d{{background:var(--errl);color:var(--err);width:100%;margin-top:12px}}
+.q{{background:#fff;border-radius:var(--r);padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);border:2px solid var(--g2);transition:border-color .2s}}
+.q.q-ok{{border-color:var(--okb)}}.q.q-err{{border-color:var(--errb)}}
+.qh{{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}}
+.qn{{font-weight:700;color:var(--p);font-size:14px}}
+.badge{{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}}
+.badge-t{{background:var(--pl);color:var(--pd)}}.badge-cancel{{background:var(--errl);color:var(--err)}}.badge-outdat{{background:var(--wl);color:var(--w)}}
+.qi{{font-size:11px;color:var(--g5);margin-bottom:4px}}.qs{{font-size:11px;color:var(--p);font-weight:600;margin-bottom:10px}}
+.qb{{line-height:1.7;margin-bottom:14px;font-size:14px}}.qb img{{max-width:100%;height:auto;border-radius:6px}}
+.alts{{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}}
+.alt{{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:8px;background:var(--g1);border:2px solid var(--g2);cursor:pointer;font-size:13px;line-height:1.6;transition:all .15s}}
+.alt:hover{{border-color:var(--p);background:var(--pl)}}.alt.sel{{border-color:var(--p);background:var(--pl)}}
+.alt.c-ok{{border-color:var(--ok)!important;background:var(--okl)!important}}.alt.c-err{{border-color:var(--err)!important;background:var(--errl)!important}}.alt.dim{{opacity:.45}}
+.alt.lock{{pointer-events:none}}
+.altl{{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--g2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--g5)}}
+.alt.sel .altl{{background:var(--p);color:#fff}}.alt.c-ok .altl{{background:var(--ok);color:#fff}}.alt.c-err .altl{{background:var(--err);color:#fff}}
+.altb{{flex:1}}.altb img{{max-width:100%;height:auto}}
+.acts{{display:flex;gap:6px;flex-wrap:wrap}}
+.btn-c{{background:var(--p);color:#fff}}.btn-c:disabled{{background:var(--g3)}}.btn-s{{background:var(--g1);color:var(--g7)}}.btn-r{{background:var(--wl);color:var(--g7)}}
+.res{{padding:10px 14px;border-radius:8px;font-weight:600;font-size:13px;margin-bottom:10px;display:none}}.res.show{{display:flex;align-items:center;gap:6px}}
+.res-ok{{background:var(--okl);color:var(--ok)}}.res-err{{background:var(--errl);color:var(--err)}}
+.ans{{margin-top:14px;padding:16px;background:var(--g1);border-radius:var(--r);border:1px solid var(--g2);display:none}}
+.ans h4{{margin-bottom:8px;color:var(--ok)}}.ans-txt{{line-height:1.7;font-size:13px}}.ans-txt img{{max-width:100%;height:auto;border-radius:6px}}
+.vid{{margin-top:12px}}.vid iframe{{width:100%;height:340px;border-radius:8px;border:none}}
+.pag{{display:flex;justify-content:center;gap:4px;margin:16px 0;flex-wrap:wrap}}
+.pag button{{padding:6px 12px;border:1px solid var(--g2);background:#fff;border-radius:6px;cursor:pointer;font-size:12px}}
+.pag button.act{{background:var(--p);color:#fff;border-color:var(--p)}}
+@media(max-width:860px){{.side{{position:relative;width:100%;border-right:none;border-bottom:1px solid var(--g2)}}.main{{margin-left:0}}.wrap{{flex-direction:column}}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<aside class="side">
+<h2>Estrategia Med — Questoes</h2>
+<p style="font-size:12px;color:var(--g5);margin-bottom:12px">{count} questoes no arquivo</p>
+<div class="stats">
+<div class="st st-t"><b id="st-t">{count}</b>Exibindo</div>
+<div class="st st-c"><b id="st-c">0</b>Acertos</div>
+<div class="st st-w"><b id="st-w">0</b>Erros</div>
+</div>
+<div class="fg"><label>Busca</label><input type="text" id="ftxt" placeholder="Buscar no enunciado..." oninput="df()"></div>
+
+<details><summary>Especialidade</summary><div class="fscroll" id="f-spec"></div></details>
+<details><summary>Instituicao</summary><div class="fscroll" id="f-inst"></div></details>
+<details><summary>Ano</summary><div class="fscroll" id="f-year"></div></details>
+<details><summary>Finalidade</summary><div class="fscroll" id="f-fin"></div></details>
+<details><summary>Banca</summary><div class="fscroll" id="f-banca"></div></details>
+<details><summary>Regiao</summary><div class="fscroll" id="f-reg"></div></details>
+
+<details open><summary>Tipo de questao</summary><div class="cbg">
+<label><input type="checkbox" class="ft" value="MULTIPLE_CHOICE" checked onchange="af()">Multipla escolha</label>
+<label><input type="checkbox" class="ft" value="TRUE_OR_FALSE" checked onchange="af()">Certo/Errado</label>
+<label><input type="checkbox" class="ft" value="DISCURSIVE" checked onchange="af()">Discursiva</label>
+</div></details>
+
+<details><summary>Vigencia</summary><div class="cbg">
+<label><input type="checkbox" id="fv-out" checked onchange="af()">Desatualizadas</label>
+<label><input type="checkbox" id="fv-can" checked onchange="af()">Anuladas</label>
+</div></details>
+
+<details><summary>Situacao</summary><div class="cbg">
+<label><input type="checkbox" id="fs-na" checked onchange="af()">Nao respondidas</label>
+<label><input type="checkbox" id="fs-ok" checked onchange="af()">Que acertei</label>
+<label><input type="checkbox" id="fs-err" checked onchange="af()">Que errei</label>
+</div></details>
+
+<button class="btn btn-d" onclick="clr()">Limpar Filtros</button>
+</aside>
+<main class="main">
+<div id="pag-t" class="pag"></div>
+<div id="qc"></div>
+<div id="pag-b" class="pag"></div>
+</main>
+</div>
+<script src="{data_filename}"></script>
+<script>
+const PP=50;let cp=1,fq=[],SA=JSON.parse(localStorage.getItem('em_ans')||'{{}}');
+const INST={_opts(inst_names)};
+const BANCA={_opts(banca_names)};
+const FIN={_opts(finalidade_names)};
+const REG={json.dumps(region_opts, ensure_ascii=False)};
+const YEARS={_opts(sorted(filter_vals["years"], reverse=True))};
+
+function init(){{
+  // Preencher filtros dinamicamente das questoes
+  let specs=new Set();Q.forEach(q=>q.to.forEach(t=>specs.add(t.n)));
+  fill('f-spec',Array.from(specs).sort(),'fs');
+  fill('f-inst',INST,'fi');
+  fill('f-year',YEARS,'fy');
+  fill('f-fin',FIN,'ff');
+  fill('f-banca',BANCA,'fb');
+  fillReg();
+  restoreAnswers();
+  fq=[...Array(Q.length).keys()];
+  rp();
+}}
+function fill(id,items,cls){{
+  let h='';items.forEach(v=>h+='<label><input type=checkbox class="'+cls+'" value="'+esc(v)+'" onchange="af()"><span>'+esc(v)+'</span></label>');
+  document.getElementById(id).innerHTML=h;
+}}
+function fillReg(){{
+  let h='';REG.forEach(r=>h+='<label><input type=checkbox class="fr" value="'+esc(r.code)+'" onchange="af()"><span>'+esc(r.label)+'</span></label>');
+  document.getElementById('f-reg').innerHTML=h;
+}}
+function esc(s){{return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}}
+function gv(cls){{return Array.from(document.querySelectorAll('.'+cls+':checked')).map(c=>c.value)}}
+let dt;function df(){{clearTimeout(dt);dt=setTimeout(af,300)}}
+
+function af(){{
+  const txt=document.getElementById('ftxt').value.toLowerCase();
+  const sp=gv('fs'),ins=gv('fi'),yr=gv('fy'),fn=gv('ff'),bk=gv('fb'),rg=gv('fr');
+  const tp=Array.from(document.querySelectorAll('.ft:checked')).map(c=>c.value);
+  const vOut=document.getElementById('fv-out').checked,vCan=document.getElementById('fv-can').checked;
+  const sNa=document.getElementById('fs-na').checked,sOk=document.getElementById('fs-ok').checked,sErr=document.getElementById('fs-err').checked;
+
+  fq=[];
+  for(let i=0;i<Q.length;i++){{
+    const q=Q[i];
+    if(tp.length&&!tp.includes(q.tp))continue;
+    if(sp.length&&!q.to.some(t=>sp.includes(t.n)))continue;
+    if(ins.length&&!ins.includes(q.in))continue;
+    if(yr.length&&!yr.includes(String(q.yr)))continue;
+    if(fn.length&&!fn.includes(q.fn))continue;
+    if(bk.length&&!bk.includes(q.bk))continue;
+    if(rg.length&&!rg.includes(q.rg))continue;
+    const lb=(q.lb||[]).map(l=>l.toUpperCase());
+    if(lb.includes('OUTDATED')&&!vOut)continue;
+    if(lb.includes('CANCELED')&&!vCan)continue;
+    const a=SA[q.id];
+    if(!a&&!sNa)continue;
+    if(a&&a.c&&!sOk)continue;
+    if(a&&!a.c&&!sErr)continue;
+    if(txt){{const s=(q.st||'').toLowerCase();if(!s.includes(txt))continue;}}
+    fq.push(i);
+  }}
+  document.getElementById('st-t').textContent=fq.length;
+  cp=1;rp();
+}}
+
+function rp(){{
+  const c=document.getElementById('qc');
+  const s=(cp-1)*PP,e=s+PP;
+  let h='';
+  for(let j=s;j<e&&j<fq.length;j++){{
+    h+=rq(Q[fq[j]],fq[j]);
+  }}
+  c.innerHTML=h;
+  rpag();
+  updStats();
+}}
+
+function rq(q,idx){{
+  const a=SA[q.id];const locked=!!a;
+  const topStr=q.to.map(t=>t.n).join(', ')||'Sem especialidade';
+  const tpLbl={{'MULTIPLE_CHOICE':'Multipla Escolha','TRUE_OR_FALSE':'Certo/Errado','DISCURSIVE':'Discursiva'}}[q.tp]||q.tp;
+  let lblH='';
+  (q.lb||[]).forEach(l=>{{
+    if(l.toUpperCase().includes('CANCEL'))lblH+='<span class="badge badge-cancel">Anulada</span>';
+    else if(l.toUpperCase().includes('OUTDAT'))lblH+='<span class="badge badge-outdat">Desatualizada</span>';
+  }});
+  let altH='<div class="alts">';
+  q.al.forEach(al=>{{
+    let cls='alt';
+    if(locked){{
+      cls+=' lock';
+      if(a.s===al.l)cls+=al.c?' c-ok':' c-err';
+      else if(al.c)cls+=' c-ok';
+      else cls+=' dim';
+    }}
+    altH+=`<div class="${{cls}}" data-l="${{al.l}}" data-c="${{al.c}}" onclick="sa(this,'${{q.id}}')"><div class="altl">${{al.l}}</div><div class="altb">${{al.b}}</div></div>`;
+  }});
+  altH+='</div>';
+  let resH='';
+  if(locked){{
+    const rc=a.c?'res-ok':'res-err';
+    const rt=a.c?'Voce acertou!':'Voce errou. Gabarito: '+q.cr;
+    resH=`<div class="res show ${{rc}}">${{rt}}</div>`;
+  }}
+  let solH='';
+  if(q.sl)solH=`<div class="ans-txt">${{q.sl}}</div>`;
+  let vidH='';
+  if(q.vu){{
+    let eu='';const v=q.vu;
+    if(v.includes('youtube.com/watch'))eu='https://www.youtube.com/embed/'+v.split('v=')[1].split('&')[0];
+    else if(v.includes('youtu.be/'))eu='https://www.youtube.com/embed/'+v.split('youtu.be/')[1].split('?')[0];
+    else if(v.includes('vimeo.com/'))eu='https://player.vimeo.com/video/'+v.split('vimeo.com/')[1].split('?')[0];
+    if(eu)vidH=`<div class="vid"><strong>Video:</strong><iframe src="${{eu}}" allowfullscreen loading="lazy"></iframe></div>`;
+    else vidH=`<div class="vid"><a href="${{v}}" target="_blank">Assistir video</a></div>`;
+  }}
+  return `<div class="q ${{locked?(a.c?'q-ok':'q-err'):''}}" id="q-${{q.id}}">
+    <div class="qh"><span class="qn">#${{idx+1}}</span><div><span class="badge badge-t">${{esc(tpLbl)}}</span>${{lblH}}</div></div>
+    <div class="qi">${{esc(q.in)}} ${{q.yr}} | ${{esc(q.bk)}}</div>
+    <div class="qs">${{esc(topStr)}}</div>
+    <div class="qb">${{q.st}}</div>
+    ${{altH}}
+    ${{resH}}
+    <div class="acts">
+      <button class="btn btn-c" onclick="ca(this,'${{q.id}}')" ${{locked?'style="display:none"':'disabled'}}>Confirmar</button>
+      <button class="btn btn-s" onclick="ta(this)">Ver Gabarito</button>
+      ${{locked?`<button class="btn btn-r" onclick="ra('${{q.id}}')">Refazer</button>`:''}}
+    </div>
+    <div class="ans"><h4>Gabarito: ${{q.cr}}</h4>${{solH}}${{vidH}}</div>
+  </div>`;
+}}
+
+function sa(el,qid){{if(el.classList.contains('lock'))return;const p=el.closest('.q');p.querySelectorAll('.alt').forEach(a=>a.classList.remove('sel'));el.classList.add('sel');p.querySelector('.btn-c').disabled=false;}}
+function ca(btn,qid){{
+  const p=btn.closest('.q');const sel=p.querySelector('.alt.sel');if(!sel)return;
+  const l=sel.dataset.l,c=sel.dataset.c==='true';
+  p.querySelectorAll('.alt').forEach(a=>{{a.classList.add('lock');if(a.dataset.c==='true')a.classList.add('c-ok');else if(a===sel&&!c)a.classList.add('c-err');else if(a!==sel)a.classList.add('dim');}});
+  p.classList.add(c?'q-ok':'q-err');
+  const q=Q.find(x=>x.id===qid);
+  let r=document.createElement('div');r.className='res show '+(c?'res-ok':'res-err');r.textContent=c?'Voce acertou!':'Voce errou. Gabarito: '+(q?q.cr:'');
+  btn.parentNode.before(r);btn.style.display='none';
+  let rb=document.createElement('button');rb.className='btn btn-r';rb.textContent='Refazer';rb.onclick=()=>ra(qid);btn.parentNode.appendChild(rb);
+  SA[qid]={{s:l,c:c}};localStorage.setItem('em_ans',JSON.stringify(SA));updStats();
+}}
+function ra(qid){{delete SA[qid];localStorage.setItem('em_ans',JSON.stringify(SA));rp();}}
+function ta(btn){{const a=btn.closest('.q').querySelector('.ans');if(a.style.display==='block'){{a.style.display='none';btn.textContent='Ver Gabarito';}}else{{a.style.display='block';btn.textContent='Ocultar';}}}}
+function updStats(){{let c=0,w=0;Object.values(SA).forEach(a=>{{if(a.c)c++;else w++;}});document.getElementById('st-c').textContent=c;document.getElementById('st-w').textContent=w;}}
+function restoreAnswers(){{updStats();}}
+
+function rpag(){{
+  const t=Math.ceil(fq.length/PP);let h='';
+  if(t>1){{
+    const mx=10;let s=Math.max(1,cp-mx/2|0),e=Math.min(t,s+mx-1);if(e-s<mx-1)s=Math.max(1,e-mx+1);
+    if(cp>1)h+='<button onclick="gp(1)">&laquo;</button><button onclick="gp('+(cp-1)+')">&lsaquo;</button>';
+    for(let i=s;i<=e;i++)h+='<button class="'+(i===cp?'act':'')+'" onclick="gp('+i+')">'+i+'</button>';
+    if(cp<t)h+='<button onclick="gp('+(cp+1)+')">&rsaquo;</button><button onclick="gp('+t+')">&raquo;</button>';
+  }}
+  document.getElementById('pag-t').innerHTML=h;document.getElementById('pag-b').innerHTML=h;
+}}
+function gp(p){{cp=p;rp();window.scrollTo(0,0);}}
+function clr(){{
+  document.getElementById('ftxt').value='';
+  document.querySelectorAll('.fs,.fi,.fy,.ff,.fb,.fr').forEach(c=>c.checked=false);
+  document.querySelectorAll('.ft').forEach(c=>c.checked=true);
+  ['fv-out','fv-can','fs-na','fs-ok','fs-err'].forEach(id=>document.getElementById(id).checked=true);
+  af();
+}}
+init();
+</script>
+</body>
+</html>"""
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(page_html)
+
+    html_size = os.path.getsize(output_path) / (1024 * 1024)
+    print(f"HTML gerado: {output_path} ({html_size:.1f} MB)")
+    print(f"Dados: {data_path} ({data_size:.1f} MB)")
+    print(f"Abra {output_path} no navegador (precisa dos 2 arquivos na mesma pasta).")
