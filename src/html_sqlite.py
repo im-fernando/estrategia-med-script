@@ -51,97 +51,283 @@ def generate_sqlite_html(
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Estrategia Med — Questoes</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{{--p:#2563eb;--pd:#1d4ed8;--pl:#dbeafe;--ok:#16a34a;--okl:#dcfce7;--okb:#86efac;--err:#dc2626;--errl:#fee2e2;--errb:#fca5a5;--w:#f59e0b;--wl:#fef3c7;--g0:#fff;--g1:#f9fafb;--g2:#e5e7eb;--g3:#d1d5db;--g5:#6b7280;--g7:#374151;--g8:#1f2937;--r:10px}}
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--g1);color:var(--g8)}}
-.wrap{{display:flex;min-height:100vh}}
-.side{{width:340px;background:var(--g0);padding:20px;border-right:1px solid var(--g2);position:fixed;top:0;left:0;bottom:0;overflow-y:auto;z-index:10}}
-.main{{margin-left:340px;padding:24px;flex:1;max-width:960px}}
-.side h2{{font-size:18px;font-weight:700;margin-bottom:8px}}
-.side .sub{{font-size:12px;color:var(--g5);margin-bottom:14px}}
-.stats{{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}}
-.st{{flex:1;min-width:60px;text-align:center;padding:8px 4px;border-radius:var(--r);font-size:11px;font-weight:500}}
-.st b{{font-size:18px;display:block}}
-.st-t{{background:var(--pl);color:var(--pd)}}.st-c{{background:var(--okl);color:var(--ok)}}.st-w{{background:var(--errl);color:var(--err)}}.st-pct{{background:var(--wl);color:var(--w)}}
-.fg{{margin-bottom:10px}}.fg label{{display:block;font-weight:600;font-size:12px;color:var(--g5);margin-bottom:4px}}
-.fg input[type=text]{{width:100%;padding:8px;border:1px solid var(--g3);border-radius:8px;font-size:13px}}
-.fscroll{{max-height:150px;overflow-y:auto;border:1px solid var(--g2);border-radius:8px;padding:6px}}
-.fscroll label{{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g7);padding:2px 0;cursor:pointer}}
-.fscroll input{{accent-color:var(--p);width:14px;height:14px}}
-.cbg{{display:flex;flex-direction:column;gap:3px}}.cbg label{{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}}.cbg input{{accent-color:var(--p);width:15px;height:15px}}
-details summary{{font-size:12px;font-weight:600;color:var(--g5);cursor:pointer;padding:6px 0;user-select:none}}
-.btn{{border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}}
-.btn-d{{background:var(--errl);color:var(--err);width:100%;margin-top:12px}}
-#loading{{text-align:center;padding:60px 20px;font-size:16px;color:var(--g5)}}
-.q{{background:var(--g0);border-radius:var(--r);padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);border:2px solid var(--g2);transition:border-color .2s}}
-.q.q-ok{{border-color:var(--okb)}}.q.q-err{{border-color:var(--errb)}}
-.qh{{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}}
-.qn{{font-weight:700;color:var(--p);font-size:14px}}
-.badge{{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-left:4px}}
-.badge-t{{background:var(--pl);color:var(--pd)}}.badge-c{{background:var(--errl);color:var(--err)}}.badge-o{{background:var(--wl);color:var(--w)}}
-.qi{{font-size:11px;color:var(--g5);margin-bottom:4px}}.qs{{font-size:11px;color:var(--p);font-weight:600;margin-bottom:10px}}
-.qb{{line-height:1.7;margin-bottom:14px;font-size:14px}}.qb img{{max-width:100%;height:auto}}
-.alts{{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}}
-.alt{{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:8px;background:var(--g1);border:2px solid var(--g2);cursor:pointer;font-size:13px;line-height:1.6;transition:all .15s}}
-.alt:hover{{border-color:var(--p);background:var(--pl)}}.alt.sel{{border-color:var(--p);background:var(--pl)}}
-.alt.c-ok{{border-color:var(--ok)!important;background:var(--okl)!important}}.alt.c-err{{border-color:var(--err)!important;background:var(--errl)!important}}.alt.dim{{opacity:.45}}.alt.lock{{pointer-events:none}}
-.altl{{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--g2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--g5)}}
-.alt.sel .altl{{background:var(--p);color:#fff}}.alt.c-ok .altl{{background:var(--ok);color:#fff}}.alt.c-err .altl{{background:var(--err);color:#fff}}
-.altb{{flex:1}}.altb img{{max-width:100%;height:auto}}
-.acts{{display:flex;gap:6px;flex-wrap:wrap}}
-.btn-c{{background:var(--p);color:#fff}}.btn-c:disabled{{background:var(--g3)}}.btn-s{{background:var(--g1);color:var(--g7)}}.btn-r{{background:var(--wl);color:var(--g7)}}
-.res{{padding:10px 14px;border-radius:8px;font-weight:600;font-size:13px;margin-bottom:10px}}
-.res-ok{{background:var(--okl);color:var(--ok)}}.res-err{{background:var(--errl);color:var(--err)}}
-.ans{{margin-top:14px;padding:16px;background:var(--g1);border-radius:var(--r);border:1px solid var(--g2);display:none}}
-.ans h4{{margin-bottom:8px;color:var(--ok)}}.ans-txt{{line-height:1.7;font-size:13px}}.ans-txt img{{max-width:100%;height:auto}}
-.vid{{margin-top:12px}}.vid iframe{{width:100%;height:340px;border-radius:8px;border:none}}
-.pag{{display:flex;justify-content:center;gap:4px;margin:16px 0;flex-wrap:wrap}}
-.pag button{{padding:6px 12px;border:1px solid var(--g2);background:var(--g0);border-radius:6px;cursor:pointer;font-size:12px}}
-.pag button.act{{background:var(--p);color:#fff;border-color:var(--p)}}
-@media(max-width:860px){{.side{{position:relative;width:100%;border-right:none;border-bottom:1px solid var(--g2)}}.main{{margin-left:0}}.wrap{{flex-direction:column}}.vid iframe{{height:220px}}}}
+:root {{
+  --bg-dark: #0f0f0f;
+  --bg-card: #1a1a1a;
+  --bg-hover: #252525;
+  --accent: #00d4aa;
+  --accent-light: #00f5c4;
+  --accent-dim: rgba(0, 212, 170, 0.12);
+  --correct: #22c55e;
+  --incorrect: #ef4444;
+  --text: #ffffff;
+  --text-muted: #888888;
+  --border: #333333;
+  --r: 16px;
+}}
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+body {{
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-dark);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 20px;
+}}
+.container {{ max-width: 1100px; margin: 0 auto; }}
+
+.header {{
+  text-align: center;
+  margin-bottom: 28px;
+  padding: 28px 24px;
+  background: linear-gradient(135deg, var(--bg-card) 0%, #1f2937 100%);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+}}
+.header h1 {{
+  font-size: 1.75rem;
+  margin-bottom: 10px;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--accent), var(--accent-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}}
+.header p {{ color: var(--text-muted); font-size: 0.95rem; }}
+.stats {{ display: flex; justify-content: center; gap: 28px; margin-top: 22px; flex-wrap: wrap; }}
+.stat {{ text-align: center; }}
+.stat-value {{ font-size: 1.75rem; font-weight: 700; color: var(--accent); }}
+.stat-label {{ font-size: 0.85rem; color: var(--text-muted); }}
+
+.filters-section {{
+  background: var(--bg-card);
+  border-radius: var(--r);
+  padding: 22px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border);
+}}
+.filters-header {{ display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }}
+.filters-header h3 {{ color: var(--accent); display: flex; align-items: center; gap: 10px; font-size: 1rem; font-weight: 600; }}
+.filters-toggle {{ color: var(--text-muted); font-size: 0.9rem; }}
+.filters-content {{
+  display: none;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}}
+.filters-content.is-open {{ display: grid; }}
+.filter-group {{ display: flex; flex-direction: column; gap: 8px; }}
+.filter-group > label {{
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}}
+.search-box {{ position: relative; }}
+.search-input {{
+  width: 100%;
+  padding: 14px 20px 14px 48px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}}
+.search-input:focus {{ outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.2); }}
+.search-icon {{ position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }}
+
+.tree-filter-scroll {{
+  max-height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  background: var(--bg-dark);
+}}
+.tree-leaf {{ padding: 5px 6px; border-radius: 8px; margin: 2px 0; }}
+.tree-leaf:hover {{ background: rgba(255,255,255,0.04); }}
+.tree-label {{ display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.85rem; color: var(--text-muted); width: 100%; line-height: 1.45; }}
+.tree-name {{ flex: 1; color: var(--text); }}
+
+/* Checkboxes — identidade */
+.filters-section input[type="checkbox"] {{
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  margin-top: 2px;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-hover);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  position: relative;
+}}
+.filters-section input[type="checkbox"]:hover {{
+  border-color: rgba(0, 212, 170, 0.55);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}}
+.filters-section input[type="checkbox"]:checked {{
+  background: var(--accent);
+  border-color: var(--accent);
+}}
+.filters-section input[type="checkbox"]:checked::after {{
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--bg-dark);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}}
+
+.questions-container {{ min-height: 200px; }}
+#loading {{ text-align: center; padding: 60px 20px; font-size: 16px; color: var(--text-muted); }}
+.q {{ background: var(--bg-card); border-radius: var(--r); padding: 28px; margin-bottom: 22px; border: 1px solid var(--border); transition: all 0.25s ease; }}
+.q:hover {{ border-color: var(--accent); box-shadow: 0 0 28px rgba(0, 212, 170, 0.08); }}
+.q.q-ok {{ border-color: rgba(34, 197, 94, 0.5); }}
+.q.q-err {{ border-color: rgba(239, 68, 68, 0.5); }}
+.qh {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px; }}
+.qn {{ font-weight: 700; font-size: 1.05rem; color: var(--accent); }}
+.badge {{ padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; margin-left: 6px; display: inline-flex; }}
+.badge-t {{ background: rgba(0, 212, 170, 0.12); color: var(--accent); }}
+.badge-c {{ background: rgba(239, 68, 68, 0.12); color: var(--incorrect); }}
+.badge-o {{ background: rgba(245, 158, 11, 0.15); color: #fbbf24; }}
+.qi {{ font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px; }}
+.qs {{ font-size: 0.9rem; color: var(--accent); font-weight: 600; margin-bottom: 14px; }}
+.qb {{ line-height: 1.8; margin-bottom: 22px; font-size: 1.02rem; color: var(--text); }}
+.qb img {{ max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; }}
+.alts {{ display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }}
+.alt {{ display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; background: var(--bg-hover); border-radius: 12px; cursor: pointer; transition: all 0.2s ease; border: 2px solid transparent; font-size: 0.95rem; line-height: 1.55; color: var(--text); }}
+.alt:hover {{ background: #2a2a2a; transform: translateX(4px); }}
+.alt.sel {{ border-color: var(--accent); background: rgba(0, 212, 170, 0.1); }}
+.alt.c-ok {{ border-color: var(--correct)!important; background: rgba(34, 197, 94, 0.1)!important; }}
+.alt.c-err {{ border-color: var(--incorrect)!important; background: rgba(239, 68, 68, 0.1)!important; }}
+.alt.dim {{ opacity: 0.42; }}
+.alt.lock {{ pointer-events: none; cursor: default; }}
+.altl {{ width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: var(--border); border-radius: 8px; font-weight: 700; flex-shrink: 0; font-size: 0.9rem; color: var(--text); transition: all 0.2s ease; }}
+.alt.sel .altl {{ background: var(--accent); color: var(--bg-dark); }}
+.alt.c-ok .altl {{ background: var(--correct); color: #fff; }}
+.alt.c-err .altl {{ background: var(--incorrect); color: #fff; }}
+.altb {{ flex: 1; padding-top: 5px; }}
+.altb img {{ max-width: 100%; height: auto; }}
+.acts {{ display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }}
+.btn {{ border: none; padding: 10px 18px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }}
+.btn-c {{ background: var(--accent); color: var(--bg-dark); }}
+.btn-c:hover {{ filter: brightness(1.08); }}
+.btn-c:disabled {{ opacity: 0.35; cursor: not-allowed; filter: none; }}
+.btn-s {{ background: var(--bg-hover); border: 1px solid var(--border); color: var(--text); }}
+.btn-s:hover {{ border-color: var(--accent); color: var(--accent); }}
+.btn-r {{ background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; }}
+.res {{ display: none; padding: 12px 16px; border-radius: 10px; margin-bottom: 12px; font-weight: 600; font-size: 0.9rem; }}
+.res.show {{ display: flex; align-items: center; }}
+.res-ok {{ background: rgba(34, 197, 94, 0.15); color: var(--correct); }}
+.res-err {{ background: rgba(239, 68, 68, 0.15); color: var(--incorrect); }}
+.ans {{ margin-top: 22px; padding: 22px; background: linear-gradient(135deg, #1f2937 0%, var(--bg-card) 100%); border-radius: 12px; border-left: 4px solid var(--accent); display: none; }}
+.ans h4 {{ margin-bottom: 12px; color: var(--correct); font-size: 1rem; }}
+.ans-txt {{ line-height: 1.75; font-size: 0.92rem; color: var(--text-muted); }}
+.ans-txt img {{ max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0; }}
+.vid {{ margin-top: 16px; }}
+.vid iframe {{ width: 100%; height: 340px; border-radius: 10px; border: none; }}
+.vid a {{ color: var(--accent); font-weight: 600; }}
+.pag {{ display: flex; justify-content: center; align-items: center; gap: 8px; margin: 26px 0; flex-wrap: wrap; }}
+.pag button {{ padding: 10px 14px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; font-weight: 500; font-size: 0.88rem; transition: all 0.2s ease; }}
+.pag button:hover:not(:disabled) {{ background: var(--accent); color: var(--bg-dark); border-color: var(--accent); }}
+.pag button.act {{ background: var(--accent); color: var(--bg-dark); border-color: var(--accent); }}
+@media (max-width: 768px) {{ body {{ padding: 12px; }} .q {{ padding: 20px; }} .vid iframe {{ height: 220px; }} .filters-content.is-open {{ grid-template-columns: 1fr; }} }}
 </style>
 </head>
 <body>
-<div class="wrap">
-<aside class="side">
-<h2>Estrategia Med</h2>
-<p class="sub" id="total-label">Carregando banco de dados...</p>
-<div class="stats">
-<div class="st st-t"><b id="st-t">-</b>Exibindo</div>
-<div class="st st-c"><b id="st-c">0</b>Acertos</div>
-<div class="st st-w"><b id="st-w">0</b>Erros</div>
-<div class="st st-pct"><b id="st-pct">-</b>Aproveit.</div>
-</div>
-<div class="fg"><label>Busca</label><input type="text" id="ftxt" placeholder="Buscar no enunciado..." oninput="df()"></div>
-<details><summary>Especialidade</summary><div class="fscroll" id="f-spec"></div></details>
-<details><summary>Instituicao</summary><div class="fscroll" id="f-inst"></div></details>
-<details><summary>Ano</summary><div class="fscroll" id="f-year"></div></details>
-<details><summary>Finalidade</summary><div class="fscroll" id="f-fin"></div></details>
-<details><summary>Banca</summary><div class="fscroll" id="f-banca"></div></details>
-<details><summary>Regiao</summary><div class="fscroll" id="f-reg"></div></details>
-<details open><summary>Tipo de questao</summary><div class="cbg">
-<label><input type="checkbox" class="ft" value="MULTIPLE_CHOICE" checked onchange="af()">Multipla escolha</label>
-<label><input type="checkbox" class="ft" value="TRUE_OR_FALSE" checked onchange="af()">Certo/Errado</label>
-<label><input type="checkbox" class="ft" value="DISCURSIVE" checked onchange="af()">Discursiva</label>
-</div></details>
-<details><summary>Vigencia</summary><div class="cbg">
-<label><input type="checkbox" id="fv-out" checked onchange="af()">Desatualizadas</label>
-<label><input type="checkbox" id="fv-can" checked onchange="af()">Anuladas</label>
-</div></details>
-<details><summary>Situacao</summary><div class="cbg">
-<label><input type="checkbox" id="fs-na" checked onchange="af()">Nao respondidas</label>
-<label><input type="checkbox" id="fs-ok" checked onchange="af()">Que acertei</label>
-<label><input type="checkbox" id="fs-err" checked onchange="af()">Que errei</label>
-</div></details>
-<button class="btn btn-d" onclick="clr()">Limpar Filtros</button>
-</aside>
-<main class="main">
-<div id="loading">Carregando banco de dados... Aguarde.</div>
-<div id="pag-t" class="pag"></div>
-<div id="qc"></div>
-<div id="pag-b" class="pag"></div>
-</main>
+<div class="container">
+  <header class="header">
+    <h1>📚 Estrategia Med — Questoes</h1>
+    <p id="total-label">Carregando banco de dados...</p>
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="st-t">-</div><div class="stat-label">Exibindo</div></div>
+      <div class="stat"><div class="stat-value" id="st-c">0</div><div class="stat-label">Acertos</div></div>
+      <div class="stat"><div class="stat-value" id="st-w">0</div><div class="stat-label">Erros</div></div>
+      <div class="stat"><div class="stat-value" id="st-pct">-</div><div class="stat-label">Aproveitamento</div></div>
+    </div>
+  </header>
+
+  <section class="filters-section">
+    <div class="filters-header" onclick="toggleFilters()">
+      <h3>🔍 Filtros e busca</h3>
+      <span class="filters-toggle" id="filters-toggle-text">▼ Expandir</span>
+    </div>
+    <div class="filters-content" id="filters-content">
+      <div class="filter-group" style="grid-column: 1 / -1;">
+        <label>Buscar no enunciado</label>
+        <div class="search-box">
+          <span class="search-icon">🔎</span>
+          <input type="text" class="search-input" id="ftxt" placeholder="Digite palavras-chave..." oninput="df()">
+        </div>
+      </div>
+      <div class="filter-group" style="grid-column: 1 / -1;">
+        <label>Especialidade e assuntos</label>
+        <div class="tree-filter-scroll" id="f-spec"></div>
+      </div>
+      <div class="filter-group" style="grid-column: 1 / -1;">
+        <label>Instituicao</label>
+        <div class="tree-filter-scroll" id="f-inst"></div>
+      </div>
+      <div class="filter-group" style="grid-column: 1 / -1;">
+        <label>Ano</label>
+        <div class="tree-filter-scroll" id="f-year"></div>
+      </div>
+      <div class="filter-group" style="grid-column: 1 / -1;">
+        <label>Finalidade</label>
+        <div class="tree-filter-scroll" id="f-fin"></div>
+      </div>
+      <div class="filter-group" style="grid-column: 1 / -1;">
+        <label>Banca</label>
+        <div class="tree-filter-scroll" id="f-banca"></div>
+      </div>
+      <div class="filter-group" style="grid-column: 1 / -1;">
+        <label>Regiao</label>
+        <div class="tree-filter-scroll" id="f-reg"></div>
+      </div>
+      <div class="filter-group">
+        <label>Tipo de questao</label>
+        <div class="tree-filter-scroll">
+          <div class="tree-leaf"><label class="tree-label"><input type="checkbox" class="ft" value="MULTIPLE_CHOICE" checked onchange="af()"><span class="tree-name">Multipla escolha</span></label></div>
+          <div class="tree-leaf"><label class="tree-label"><input type="checkbox" class="ft" value="TRUE_OR_FALSE" checked onchange="af()"><span class="tree-name">Certo/Errado</span></label></div>
+          <div class="tree-leaf"><label class="tree-label"><input type="checkbox" class="ft" value="DISCURSIVE" checked onchange="af()"><span class="tree-name">Discursiva</span></label></div>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Vigencia</label>
+        <div class="tree-filter-scroll">
+          <div class="tree-leaf"><label class="tree-label"><input type="checkbox" id="fv-out" checked onchange="af()"><span class="tree-name">Desatualizadas</span></label></div>
+          <div class="tree-leaf"><label class="tree-label"><input type="checkbox" id="fv-can" checked onchange="af()"><span class="tree-name">Anuladas</span></label></div>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Situacao</label>
+        <div class="tree-filter-scroll">
+          <div class="tree-leaf"><label class="tree-label"><input type="checkbox" id="fs-na" checked onchange="af()"><span class="tree-name">Nao respondidas</span></label></div>
+          <div class="tree-leaf"><label class="tree-label"><input type="checkbox" id="fs-ok" checked onchange="af()"><span class="tree-name">Que acertei</span></label></div>
+          <div class="tree-leaf"><label class="tree-label"><input type="checkbox" id="fs-err" checked onchange="af()"><span class="tree-name">Que errei</span></label></div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); display:flex; justify-content:flex-end;">
+      <button class="btn btn-s" onclick="clr()">Limpar filtros</button>
+    </div>
+  </section>
+
+  <div id="loading">Carregando banco de dados... Aguarde.</div>
+  <div id="pag-t" class="pag"></div>
+  <div id="qc" class="questions-container"></div>
+  <div id="pag-b" class="pag"></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/sql-wasm.js"></script>
@@ -156,8 +342,9 @@ const FINS={_js_arr(finalidade_names)};
 const BANCAS={_js_arr(banca_names)};
 const REGS={_js_arr(region_opts)};
 let dt;function df(){{clearTimeout(dt);dt=setTimeout(af,400)}}
+function toggleFilters(){{const box=document.getElementById('filters-content');const t=document.getElementById('filters-toggle-text');if(!box||!t)return;const open=box.classList.toggle('is-open');t.textContent=open?'▲ Recolher':'▼ Expandir';}}
 function esc(s){{return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}}
-function fill(id,items,cls){{let h='';items.forEach(v=>h+='<label><input type=checkbox class="'+cls+'" value="'+esc(v)+'" onchange="af()"><span>'+esc(v)+'</span></label>');document.getElementById(id).innerHTML=h}}
+function fill(id,items,cls){{let h='';items.forEach(v=>h+=`<div class=\"tree-leaf\"><label class=\"tree-label\"><input type=\"checkbox\" class=\"${{cls}}\" value=\"${{esc(v)}}\" onchange=\"af()\"><span class=\"tree-name\">${{esc(v)}}</span></label></div>`);document.getElementById(id).innerHTML=h}}
 function gv(cls){{return Array.from(document.querySelectorAll('.'+cls+':checked')).map(c=>c.value)}}
 
 async function init(){{
