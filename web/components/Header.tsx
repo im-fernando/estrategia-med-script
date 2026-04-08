@@ -8,39 +8,36 @@ interface HeaderProps {
 
 export function Header({ total, filtered, stats }: HeaderProps) {
   return (
-    <div className="text-center mb-7 p-7 bg-gradient-to-br from-card to-[#1f2937] rounded-2xl border border-border">
-      <h1 className="text-2xl font-bold mb-2 bg-gradient-to-r from-accent to-accent-light bg-clip-text text-transparent">
-        Estrategia Med
-      </h1>
-      <p className="text-muted text-sm">
-        {total.toLocaleString()} questoes no banco
-      </p>
-      <div className="flex justify-center gap-7 mt-5 flex-wrap">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-accent">
-            {filtered.toLocaleString()}
-          </div>
-          <div className="text-xs text-muted">Exibindo</div>
+    <header className="header">
+      <h1>📚 Estrategia Med — Questoes</h1>
+      <p>{total.toLocaleString()} questoes no banco</p>
+      <div className="stats">
+        <div className="stat">
+          <div className="stat-value">{filtered.toLocaleString()}</div>
+          <div className="stat-label">Exibindo</div>
         </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-correct">
+        <div className="stat">
+          <div className="stat-value" style={{ color: "var(--color-correct)" }}>
             {stats.correct}
           </div>
-          <div className="text-xs text-muted">Acertos</div>
+          <div className="stat-label">Acertos</div>
         </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-incorrect">
+        <div className="stat">
+          <div
+            className="stat-value"
+            style={{ color: "var(--color-incorrect)" }}
+          >
             {stats.wrong}
           </div>
-          <div className="text-xs text-muted">Erros</div>
+          <div className="stat-label">Erros</div>
         </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-yellow-400">
+        <div className="stat">
+          <div className="stat-value" style={{ color: "#fbbf24" }}>
             {stats.pct > 0 ? `${stats.pct}%` : "-"}
           </div>
-          <div className="text-xs text-muted">Aproveit.</div>
+          <div className="stat-label">Aproveitamento</div>
         </div>
       </div>
-    </div>
+    </header>
   );
 }

@@ -15,27 +15,28 @@ export function Pagination({
 
   const maxButtons = 7;
   let start = Math.max(1, currentPage - Math.floor(maxButtons / 2));
-  let end = Math.min(totalPages, start + maxButtons - 1);
+  const end = Math.min(totalPages, start + maxButtons - 1);
   if (end - start < maxButtons - 1)
     start = Math.max(1, end - maxButtons + 1);
 
   const pages = [];
   for (let i = start; i <= end; i++) pages.push(i);
 
-  const btn =
-    "px-3 py-1.5 border border-border bg-card rounded-lg cursor-pointer text-xs transition-all hover:bg-hover";
-  const active = "bg-accent text-dark border-accent font-bold";
-
   return (
-    <div className="flex justify-center gap-1 my-4 flex-wrap">
+    <div className="pagination">
       {currentPage > 1 && (
         <>
-          <button onClick={() => onPageChange(1)} className={btn}>
+          <button
+            type="button"
+            onClick={() => onPageChange(1)}
+            className="page-btn"
+          >
             &laquo;
           </button>
           <button
+            type="button"
             onClick={() => onPageChange(currentPage - 1)}
-            className={btn}
+            className="page-btn"
           >
             &lsaquo;
           </button>
@@ -43,9 +44,10 @@ export function Pagination({
       )}
       {pages.map((p) => (
         <button
+          type="button"
           key={p}
           onClick={() => onPageChange(p)}
-          className={`${btn} ${p === currentPage ? active : ""}`}
+          className={`page-btn ${p === currentPage ? "active" : ""}`}
         >
           {p}
         </button>
@@ -53,12 +55,17 @@ export function Pagination({
       {currentPage < totalPages && (
         <>
           <button
+            type="button"
             onClick={() => onPageChange(currentPage + 1)}
-            className={btn}
+            className="page-btn"
           >
             &rsaquo;
           </button>
-          <button onClick={() => onPageChange(totalPages)} className={btn}>
+          <button
+            type="button"
+            onClick={() => onPageChange(totalPages)}
+            className="page-btn"
+          >
             &raquo;
           </button>
         </>

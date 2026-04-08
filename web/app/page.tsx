@@ -27,6 +27,7 @@ function filtersToParams(filters: FiltersType): string {
 }
 
 export default function Home() {
+  const [mounted, setMounted] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [filterValues, setFilterValues] = useState<FilterValues | null>(null);
@@ -37,6 +38,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const { answers, save, clear, stats } = useAnswers();
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => setMounted(true), []);
 
   // Load filter values once
   useEffect(() => {
@@ -49,8 +52,6 @@ export default function Home() {
   // Load questions when filters change
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-
     fetch(`/api/questions?${filtersToParams(filters)}`)
       .then((r) => r.json())
       .then(({ data, count }: { data: Question[]; count: number }) => {
@@ -75,14 +76,17 @@ export default function Home() {
 
     if (newFilters.search !== undefined) {
       debounceRef.current = setTimeout(() => {
+        setLoading(true);
         setFilters(newFilters);
       }, 400);
     } else {
+      setLoading(true);
       setFilters(newFilters);
     }
   }, []);
 
   const handlePageChange = useCallback((page: number) => {
+    setLoading(true);
     setFilters((prev) => ({ ...prev, page }));
     window.scrollTo(0, 0);
   }, []);
@@ -90,8 +94,16 @@ export default function Home() {
   const totalPages = Math.ceil(totalCount / PER_PAGE);
   const currentPage = filters.page || 1;
 
+  if (!mounted) {
+    return (
+      <div className="container" style={{ textAlign: "center", paddingTop: "100px", color: "#888" }}>
+        Carregando...
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-[1100px] mx-auto p-5">
+    <div className="container">
       <Header total={totalCount} filtered={totalCount} stats={stats} />
 
       {filterValues && (

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { SavedAnswer } from "@/lib/types";
 
 const STORAGE_KEY = "em_ans";
@@ -7,14 +7,15 @@ const STORAGE_KEY = "em_ans";
 type Answers = Record<string, SavedAnswer>;
 
 export function useAnswers() {
-  const [answers, setAnswers] = useState<Answers>({});
-
-  useEffect(() => {
+  const [answers, setAnswers] = useState<Answers>(() => {
+    if (typeof window === "undefined") return {};
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setAnswers(JSON.parse(raw));
-    } catch {}
-  }, []);
+      return raw ? (JSON.parse(raw) as Answers) : {};
+    } catch {
+      return {};
+    }
+  });
 
   const save = useCallback((id: string, letter: string, correct: boolean) => {
     setAnswers((prev) => {

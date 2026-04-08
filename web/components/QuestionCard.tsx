@@ -55,12 +55,6 @@ export function QuestionCard({
     onClear(q.id);
   };
 
-  const borderClass = locked
-    ? isCorrectAnswer
-      ? "border-correct/50"
-      : "border-incorrect/50"
-    : "border-border hover:border-accent";
-
   // Video embed
   let videoEmbed = "";
   if (q.video_url) {
@@ -71,81 +65,83 @@ export function QuestionCard({
       videoEmbed = `https://www.youtube.com/embed/${v.split("youtu.be/")[1]?.split("?")[0]}`;
   }
 
+  const meta = [q.institution, q.year ? String(q.year) : ""].filter(Boolean).join(" · ");
+
+  const badgeYear = meta ? <span className="badge badge-year">{meta}</span> : null;
+  const badgeType = (
+    <span className="badge badge-type">
+      {TYPE_LABELS[q.answer_type] || q.answer_type}
+    </span>
+  );
+  const badgeTopic = <span className="badge badge-topic">{topicStr}</span>;
+  const badgeBanca = q.banca ? (
+    <span className="badge badge-specialty">{q.banca}</span>
+  ) : null;
+
   return (
     <div
-      className={`bg-card rounded-2xl p-7 mb-5 border-2 transition-all ${borderClass}`}
+      className={[
+        "question-card",
+        "question",
+        locked ? (isCorrectAnswer ? "answered-correct" : "answered-wrong") : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
-      {/* Header */}
-      <div className="flex justify-between items-center mb-4 pb-3 border-b border-border flex-wrap gap-2">
-        <span className="font-bold text-accent">#{index + 1}</span>
-        <div className="flex gap-1.5">
-          <span className="badge-type">
-            {TYPE_LABELS[q.answer_type] || q.answer_type}
-          </span>
-          {q.labels.map((l) =>
-            l.toUpperCase().includes("CANCEL") ? (
-              <span key={l} className="badge-cancel">
-                Anulada
-              </span>
-            ) : l.toUpperCase().includes("OUTDAT") ? (
-              <span key={l} className="badge-outdat">
-                Desatualizada
-              </span>
-            ) : null
-          )}
+      <div className="question-header">
+        <span className="question-number">#{index + 1}</span>
+        <div className="question-meta">
+          {badgeYear}
+          {badgeType}
+          {badgeTopic}
+          {badgeBanca}
+          {q.labels.map((l) => {
+            const up = l.toUpperCase();
+            if (up.includes("CANCEL"))
+              return (
+                <span key={l} className="badge badge-anulada">
+                  Anulada
+                </span>
+              );
+            if (up.includes("OUTDAT"))
+              return (
+                <span key={l} className="badge badge-outdated">
+                  Desatualizada
+                </span>
+              );
+            return null;
+          })}
         </div>
       </div>
 
-      {/* Meta */}
-      <div className="text-sm text-muted mb-2">
-        {q.institution} {q.year || ""} | {q.banca}
-      </div>
-      <div className="text-sm text-accent font-semibold mb-3">{topicStr}</div>
+      <div className="enunciado question-html" dangerouslySetInnerHTML={{ __html: q.statement }} />
 
-      {/* Statement */}
-      <div
-        className="leading-relaxed mb-5 text-[15px] question-html"
-        dangerouslySetInnerHTML={{ __html: q.statement }}
-      />
-
-      {/* Alternatives */}
-      <div className="flex flex-col gap-3 mb-4">
+      <div className="alternativas">
         {q.alternatives.map((alt) => {
-          let altClass =
-            "flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all border-2 text-sm leading-relaxed";
+          const isSelected = selected === alt.letter;
+          const isWrongSelected = locked && isSelected && !alt.correct;
 
-          if (locked) {
-            altClass += " pointer-events-none";
-            if (alt.correct) altClass += " border-correct/80 bg-correct/10";
-            else if (alt.letter === selected && !alt.correct)
-              altClass += " border-incorrect/80 bg-incorrect/10";
-            else altClass += " border-transparent opacity-40";
-          } else if (selected === alt.letter) {
-            altClass += " border-accent bg-accent/10";
-          } else {
-            altClass +=
-              " border-transparent bg-hover hover:bg-[#2a2a2a] hover:translate-x-1";
-          }
-
-          let letterClass =
-            "w-9 h-9 flex items-center justify-center rounded-lg font-bold text-sm flex-shrink-0 transition-all";
-          if (locked && alt.correct)
-            letterClass += " bg-correct text-white";
-          else if (locked && alt.letter === selected && !alt.correct)
-            letterClass += " bg-incorrect text-white";
-          else if (selected === alt.letter)
-            letterClass += " bg-accent text-dark";
-          else letterClass += " bg-border text-white";
+          const altClasses = [
+            "alternativa",
+            "alt",
+            !locked && isSelected ? "selected" : "",
+            locked && alt.correct ? "correct-reveal" : "",
+            isWrongSelected ? "wrong-reveal" : "",
+            locked && !isSelected && !alt.correct ? "dimmed" : "",
+            locked ? "locked" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
 
           return (
             <div
               key={alt.letter}
-              className={altClass}
+              className={altClasses}
               onClick={() => handleSelect(alt.letter)}
             >
-              <div className={letterClass}>{alt.letter}</div>
+              <div className="letra">{alt.letter}</div>
               <div
-                className="flex-1 pt-1 question-html"
+                className="texto-alt question-html"
                 dangerouslySetInnerHTML={{ __html: alt.body }}
               />
             </div>
@@ -153,14 +149,13 @@ export function QuestionCard({
         })}
       </div>
 
-      {/* Result banner */}
       {locked && (
         <div
-          className={`p-3 rounded-xl font-semibold text-sm mb-3 ${
-            isCorrectAnswer
-              ? "bg-correct/10 text-correct"
-              : "bg-incorrect/10 text-incorrect"
-          }`}
+          className={[
+            "result-banner",
+            "show",
+            isCorrectAnswer ? "correct" : "wrong",
+          ].join(" ")}
         >
           {isCorrectAnswer
             ? "Voce acertou!"
@@ -168,64 +163,59 @@ export function QuestionCard({
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="q-actions">
         {!locked && (
           <button
+            type="button"
+            className="btn btn-confirm"
             onClick={handleConfirm}
             disabled={!selected}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-dark disabled:bg-border disabled:text-muted transition-colors"
           >
-            Confirmar
+            Confirmar resposta
           </button>
         )}
         <button
+          type="button"
+          className="btn btn-show"
           onClick={() => setShowSolution(!showSolution)}
-          className="px-4 py-2 rounded-xl text-xs font-semibold bg-hover text-white hover:bg-[#2a2a2a] transition-colors"
         >
-          {showSolution ? "Ocultar" : "Ver Gabarito"}
+          {showSolution ? "Ocultar gabarito" : "Ver gabarito"}
         </button>
         {locked && (
           <button
+            type="button"
+            className="btn btn-reset"
             onClick={handleReset}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-yellow-400/20 text-yellow-400 hover:bg-yellow-400/30 transition-colors"
           >
             Refazer
           </button>
         )}
       </div>
 
-      {/* Solution */}
       {showSolution && (
-        <div className="mt-4 p-4 bg-dark rounded-2xl border border-border">
-          <h4 className="text-correct font-semibold mb-2">
-            Gabarito: {q.correct_letter}
-          </h4>
+        <div className="answer-section comentario">
+          <div className="gabarito">
+            <strong>Gabarito:</strong> {q.correct_letter}
+          </div>
+
           {q.solution && (
             <div
-              className="leading-relaxed text-sm text-muted question-html"
+              className="solution-text-content question-html"
               dangerouslySetInnerHTML={{ __html: q.solution }}
             />
           )}
-          {videoEmbed && (
-            <div className="mt-3">
-              <iframe
-                src={videoEmbed}
-                className="w-full h-[340px] rounded-xl"
-                allowFullScreen
-                loading="lazy"
-              />
+
+          {(videoEmbed || q.video_url) && (
+            <div className="video-solution">
+              <strong>Correcao em Video:</strong>
+              {videoEmbed ? (
+                <iframe src={videoEmbed} allowFullScreen loading="lazy" />
+              ) : (
+                <a href={q.video_url} target="_blank" rel="noopener">
+                  Assistir video
+                </a>
+              )}
             </div>
-          )}
-          {q.video_url && !videoEmbed && (
-            <a
-              href={q.video_url}
-              target="_blank"
-              rel="noopener"
-              className="text-accent text-sm font-semibold hover:underline"
-            >
-              Assistir video
-            </a>
           )}
         </div>
       )}
