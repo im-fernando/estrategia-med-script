@@ -129,6 +129,19 @@ def _region_filter_markup(region_items: list[dict], region_codes_fallback: list[
     return f'<div id="filter-region-tree" class="tree-filter-scroll" role="group" aria-label="Regioes">{opts}</div>'
 
 
+def _simple_checkbox_filter(names: list[str], tree_id: str, cb_class: str, aria_label: str) -> str:
+    """Lista plana de checkboxes no mesmo bloco visual da arvore de regiao."""
+    rows = []
+    for s in names:
+        esc = _escape(s)
+        rows.append(
+            f'<div class="tree-leaf"><label class="tree-label"><input type="checkbox" class="{cb_class}" '
+            f'value="{esc}" onchange="applyFilters()"><span class="tree-name">{esc}</span></label></div>'
+        )
+    al = _escape(aria_label)
+    return f'<div id="{tree_id}" class="tree-filter-scroll" role="group" aria-label="{al}">{"".join(rows)}</div>'
+
+
 # Catalog IDs conhecidos (da config)
 CATALOG_INSTITUTION = "63b07b3e-c200-4b3d-b9e6-742a096ae26e"
 CATALOG_BANCA = "5d401e50-47cf-4d06-9a2f-19997cd0f258"
@@ -396,15 +409,11 @@ def generate_html(questions: list[dict], filter_options: dict, output_path: str 
     topics_tree = filter_options.get("topics", [])
     specialty_filter_html = _specialty_filter_markup(topics_tree, fv["specialties"])
 
-    institution_options = "".join(
-        f'<option value="{_escape(s)}">{_escape(s)}</option>' for s in fv["institutions"]
+    institution_filter_html = _simple_checkbox_filter(
+        fv["institutions"], "filter-institution-tree", "filter-institution-cb", "Instituicoes"
     )
-    year_options = "".join(
-        f'<option value="{_escape(s)}">{_escape(s)}</option>' for s in fv["years"]
-    )
-    jury_options = "".join(
-        f'<option value="{_escape(s)}">{_escape(s)}</option>' for s in fv["jurys"]
-    )
+    year_filter_html = _simple_checkbox_filter(fv["years"], "filter-year-tree", "filter-year-cb", "Anos")
+    jury_filter_html = _simple_checkbox_filter(fv["jurys"], "filter-jury-tree", "filter-jury-cb", "Bancas")
 
     # Regioes: extrair estados unicos do S3 locations + das questoes
     regions_data = filter_options.get("regions", [])
@@ -583,7 +592,7 @@ body {{
 .cb-group {{ display: flex; flex-direction: column; gap: 8px; }}
 .cb-group label {{
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     font-size: 0.88rem;
     color: var(--text-muted);
@@ -592,8 +601,51 @@ body {{
     text-transform: none;
     letter-spacing: 0;
 }}
-.cb-group input {{ width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }}
 .required-tag {{ font-size: 0.65rem; color: var(--incorrect); font-weight: 700; margin-left: 6px; }}
+
+/* Checkboxes — identidade (fundo escuro + acento teal) */
+.filters-section input[type="checkbox"] {{
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    margin-top: 2px;
+    flex-shrink: 0;
+    border: 2px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg-hover);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    position: relative;
+    box-sizing: border-box;
+}}
+.filters-section input[type="checkbox"]:hover {{
+    border-color: rgba(0, 212, 170, 0.55);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+}}
+.filters-section input[type="checkbox"]:checked {{
+    background: var(--accent);
+    border-color: var(--accent);
+}}
+.filters-section input[type="checkbox"]:checked::after {{
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 4px;
+    height: 8px;
+    border: solid var(--bg-dark);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}}
+.filters-section input[type="checkbox"]:focus-visible {{
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.45);
+}}
+.filters-section input[type="checkbox"]:checked:focus-visible {{
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.35), 0 0 0 1px var(--accent-light);
+}}
 
 .filter-actions {{
     margin-top: 18px;
@@ -703,7 +755,6 @@ body {{
     width: 100%;
     line-height: 1.45;
 }}
-.tree-label input {{ accent-color: var(--accent); }}
 .tree-name {{ flex: 1; color: var(--text); }}
 .tree-branch .tree-label .tree-name {{ font-weight: 500; }}
 
@@ -976,17 +1027,17 @@ body {{
             <label>Especialidade e assuntos</label>
             {specialty_filter_html}
         </div>
-        <div class="filter-group">
+        <div class="filter-group" style="grid-column: 1 / -1;">
             <label>Instituicao</label>
-            <select id="filter-institution" multiple onchange="applyFilters()">{institution_options}</select>
+            {institution_filter_html}
         </div>
-        <div class="filter-group">
+        <div class="filter-group" style="grid-column: 1 / -1;">
             <label>Ano</label>
-            <select id="filter-year" multiple onchange="applyFilters()">{year_options}</select>
+            {year_filter_html}
         </div>
-        <div class="filter-group">
+        <div class="filter-group" style="grid-column: 1 / -1;">
             <label>Banca</label>
-            <select id="filter-jury" multiple onchange="applyFilters()">{jury_options}</select>
+            {jury_filter_html}
         </div>
         <div class="filter-group" style="grid-column: 1 / -1;">
             <label>Regiao</label>
@@ -1220,12 +1271,6 @@ function toggleAnswer(btn) {{
 }}
 
 // ---- Filters ----
-function getSelectedValues(id) {{
-    const sel = document.getElementById(id);
-    if (!sel || !sel.selectedOptions) return [];
-    return Array.from(sel.selectedOptions).filter(o => o.value).map(o => o.value);
-}}
-
 function getTreeCheckboxValues(treeId, checkedSelector) {{
     const root = document.getElementById(treeId);
     if (!root) return [];
@@ -1248,9 +1293,9 @@ function toggleFilters() {{
 function applyFilters() {{
     const text = document.getElementById('filter-text').value.toLowerCase();
     const specialties = getTreeCheckboxValues('filter-specialty-tree', '.filter-topic-cb:checked');
-    const institutions = getSelectedValues('filter-institution');
-    const years = getSelectedValues('filter-year');
-    const jurys = getSelectedValues('filter-jury');
+    const institutions = getTreeCheckboxValues('filter-institution-tree', '.filter-institution-cb:checked');
+    const years = getTreeCheckboxValues('filter-year-tree', '.filter-year-cb:checked');
+    const jurys = getTreeCheckboxValues('filter-jury-tree', '.filter-jury-cb:checked');
     const regions = getTreeCheckboxValues('filter-region-tree', '.filter-region-cb:checked');
 
     const allowTypes = [];
@@ -1336,12 +1381,11 @@ function goTo(p) {{ currentPage = p; renderPage(); window.scrollTo(0,0); }}
 
 function clearFilters() {{
     document.getElementById('filter-text').value = '';
-    document.querySelectorAll('#filter-specialty-tree .filter-topic-cb, #filter-region-tree .filter-region-cb').forEach(cb => {{ cb.checked = false; }});
-    ['filter-institution','filter-year','filter-jury'].forEach(id => {{
-        const sel = document.getElementById(id);
-        if (!sel) return;
-        for (const o of sel.options) o.selected = false;
-    }});
+    document.querySelectorAll(
+        '#filter-specialty-tree .filter-topic-cb, #filter-region-tree .filter-region-cb, '
+        + '#filter-institution-tree .filter-institution-cb, #filter-year-tree .filter-year-cb, '
+        + '#filter-jury-tree .filter-jury-cb'
+    ).forEach(cb => {{ cb.checked = false; }});
     ['ft-true-or-false','ft-multiple-choice','ft-discursive',
      'fs-with-text','fs-without-text','fs-with-video','fs-without-video',
      'fv-outdated','fv-canceled','fst-all','fst-correct','fst-wrong'].forEach(id => {{

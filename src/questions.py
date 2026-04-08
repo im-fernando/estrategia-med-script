@@ -39,9 +39,10 @@ def build_search_filters(catalogs: list[dict], topic_ids: list[str] = None) -> l
                 "origin": catalog.get("origin", "catalogs"),
             })
 
-    # 3. Tipos de questao
+    # 3. Tipos de questao - todos
     filters.append({"add": True, "entity": "answer_type", "entity_ids": ["TRUE_OR_FALSE"], "filtro_includente": True})
     filters.append({"add": True, "entity": "answer_type", "entity_ids": ["MULTIPLE_CHOICE"], "filtro_includente": True})
+    filters.append({"add": True, "entity": "answer_type", "entity_ids": ["DISCURSIVE"], "filtro_includente": True})
 
     # 4. Situacao
     filters.append({"add": True, "entity": "already_answered", "entity_ids": [], "filtro_includente": True})
@@ -53,6 +54,10 @@ def build_search_filters(catalogs: list[dict], topic_ids: list[str] = None) -> l
     filters.append({"add": True, "entity": "include_with_video_solution", "entity_ids": [], "filtro_includente": True})
     filters.append({"add": True, "entity": "include_without_video_solution", "entity_ids": [], "filtro_includente": True})
     filters.append({"add": True, "entity": "include_with_video_and_text_solution", "entity_ids": [], "filtro_includente": True})
+
+    # 6. Vigencia - incluir anuladas e desatualizadas para pegar tudo
+    filters.append({"add": True, "entity": "label", "entity_ids": ["CANCELED"], "filtro_includente": True})
+    filters.append({"add": True, "entity": "label", "entity_ids": ["OUTDATED"], "filtro_includente": True})
 
     return filters
 
