@@ -239,8 +239,8 @@ def fetch_all_questions(
                 token_pag = data.get("token_pagination", {})
                 next_token = token_pag.get("next_page_token", None) if isinstance(token_pag, dict) else None
 
-                # Salvar cache periodicamente
-                if page % 10 == 0:
+                # Salvar cache a cada 50 paginas (5000 questoes) em vez de 10
+                if page % 50 == 0:
                     save_cache(questions)
                     if next_token:
                         with open(token_file, "w") as f:
@@ -260,7 +260,11 @@ def fetch_all_questions(
                 print("Cache salvo. Voce pode retomar depois.")
                 raise
 
-            save_cache(questions)
+    # Salvar cache final
+    save_cache(questions)
+    if next_token:
+        with open(token_file, "w") as f:
+            f.write(next_token)
 
     print(f"\nTotal de questoes baixadas: {len(questions)}")
     return questions
