@@ -196,7 +196,9 @@ export function fetchFilterValues(): FilterValues {
     for (const node of byPath.values()) {
       if (node.parent_path && byPath.has(node.parent_path)) {
         byPath.get(node.parent_path)!.children.push(node);
-      } else {
+      } else if (!node.parent_path) {
+        // Somente nós sem parent_path são raízes reais (depth 0)
+        // Orphans (parent_path existe mas não encontrado) são ignorados
         roots.push(node);
       }
     }
@@ -212,7 +214,8 @@ export function fetchFilterValues(): FilterValues {
   }
 
   return {
-    specialties,
+    // Se tem topicsTree, specialties fica vazio (o acordeao é a UI principal)
+    specialties: topicsTree && topicsTree.length > 0 ? [] : specialties,
     topicsTree,
     institutions: distinct("institution"),
     years,

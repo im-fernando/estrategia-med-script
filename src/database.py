@@ -175,22 +175,33 @@ def build_from_jsonl(jsonl_path: str, db_path: str = DB_PATH) -> int:
 
     conn.commit()
 
-    # Popular tabela de especialidades
+    # Popular tabela de especialidades e topicos
     print(f"\n  Extraindo especialidades...")
     rows = conn.execute("SELECT DISTINCT topics FROM questions WHERE topics != '[]'").fetchall()
     specs = set()
-    topic_rows = []
+    topic_rows = {}  # path -> (path, name, parent, depth) deduplicado
     for r in rows:
         try:
             for t in json.loads(r[0]):
                 name = (t.get("n") or "").strip()
-                path = (t.get("p") or "").strip()
+                raw_path = t.get("p") or ""
                 if name:
                     specs.add(name)
-                if name and path:
-                    depth = path.count("[$$]")
-                    parent = path.rsplit("[$$]", 1)[0] if "[$$]" in path else None
-                    topic_rows.append((path, name, parent, depth))
+                if not (name and raw_path):
+                    continue
+                # Normalizar path: trim cada segmento individualmente
+                segments = [seg.strip() for seg in raw_path.split("[$$]")]
+                norm_path = "[$$]".join(segments)
+                depth = len(segments) - 1
+                parent = "[$$]".join(segments[:-1]) if depth > 0 else None
+                topic_rows[norm_path] = (norm_path, segments[-1].strip(), parent, depth)
+                # Garantir que todos os ancestrais intermediarios existam
+                for i in range(1, len(segments)):
+                    ancestor_path = "[$$]".join(segments[:i])
+                    ancestor_name = segments[i - 1].strip()
+                    ancestor_parent = "[$$]".join(segments[:i - 1]) if i > 1 else None
+                    if ancestor_path not in topic_rows:
+                        topic_rows[ancestor_path] = (ancestor_path, ancestor_name, ancestor_parent, i - 1)
         except json.JSONDecodeError:
             pass
     for name in specs:
@@ -198,7 +209,7 @@ def build_from_jsonl(jsonl_path: str, db_path: str = DB_PATH) -> int:
     if topic_rows:
         conn.executemany(
             "INSERT OR IGNORE INTO topics (path, name, parent_path, depth) VALUES (?,?,?,?)",
-            topic_rows,
+            topic_rows.values(),
         )
     conn.commit()
     print(f"  {len(specs)} especialidades inseridas.")
