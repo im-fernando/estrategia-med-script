@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-dark: #0f0f0f;
+  --color-card: #1a1a1a;
+  --color-hover: #252525;
+  --color-accent: #00d4aa;
+  --color-accent-light: #00f5c4;
+  --color-correct: #22c55e;
+  --color-incorrect: #ef4444;
+  --color-muted: #888888;
+  --color-border: #333333;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  background: var(--color-dark);
+  color: #ffffff;
+  font-family: var(--font-sans);
+}
+
+/* HTML content from questions */
+.question-html img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.question-html p {
+  margin-bottom: 0.5em;
+}
+
+.question-html table {
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+.question-html td,
+.question-html th {
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  font-size: 0.875rem;
+}
+
+/* Badge styles */
+.badge-type {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(0, 212, 170, 0.12);
+  color: var(--color-accent);
+}
+
+.badge-cancel {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-incorrect);
+}
+
+.badge-outdat {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
