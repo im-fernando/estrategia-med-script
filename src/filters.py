@@ -150,39 +150,44 @@ def fetch_catalog_options(session: requests.Session, catalog_id: str) -> list[di
 
 
 def fetch_teachers(session: requests.Session) -> list[dict]:
-    """Busca lista de professores."""
-    from src.api_client import get
-    data = get(session, "/bff/questions/filters/teacher")
-    return data.get("data", data) if isinstance(data, dict) else data
+    """Busca lista de professores (paginado)."""
+    all_teachers = []
+    page = 1
+    per_page = 100
+
+    while True:
+        data = _rate_limited_get(
+            session,
+            "/bff/questions/filters/teacher",
+            params={"page": page, "per_page": per_page},
+        )
+        items = data.get("data", []) if isinstance(data, dict) else data
+        if not isinstance(items, list) or not items:
+            break
+        all_teachers.extend(items)
+
+        pagination = data.get("pagination", {}) if isinstance(data, dict) else {}
+        total = pagination.get("total", 0)
+        if len(all_teachers) >= total or len(items) < per_page:
+            break
+        page += 1
+
+    return all_teachers
 
 
 def fetch_regions(session: requests.Session) -> list[dict]:
-    """Busca regioes com subregioes em paralelo."""
-    from src.api_client import get
-
-    all_regions = []
-    for region_type in ["STATE", "MUNICIPAL", "TYPES"]:
-        try:
-            data = get(session, f"/bff/questions/filters/region/{region_type}")
-            items = data.get("data", data) if isinstance(data, dict) else data
-            if not isinstance(items, list):
-                continue
-            for item in items:
-                item["_depth"] = 0
-                item["_region_type"] = region_type
-                all_regions.append(item)
-        except Exception:
-            pass
-
-    # Buscar subregioes em paralelo
-    items_with_children = [r for r in all_regions if r.get("has_children")]
-    if items_with_children:
-        sub = fetch_tree_parallel(session, items_with_children, root_depth=1, max_workers=4)
-        for s in sub:
-            s["_region_type"] = s.get("_region_type", "")
-        all_regions.extend(sub)
-
-    return all_regions
+    """Busca regioes do JSON estatico no S3 (request limpo, sem headers de auth)."""
+    try:
+        resp = requests.get(
+            "https://questions-production-config.s3-sa-east-1.amazonaws.com/locations-v2.json"
+        )
+        resp.raise_for_status()
+        locations = resp.json()
+        if isinstance(locations, list):
+            return locations
+    except Exception as e:
+        print(f"    Aviso: erro ao buscar regioes: {e}")
+    return []
 
 
 def generate_years(start: int = 2003, end: int = 2026) -> list[int]:
