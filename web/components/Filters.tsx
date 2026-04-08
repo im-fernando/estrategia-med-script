@@ -88,6 +88,7 @@ export function Filters({ filterValues, filters, onChange }: FiltersProps) {
 
   const types = filters.types || [
     "MULTIPLE_CHOICE",
+    "MULTIPLE_CHOICE_FOUR",
     "TRUE_OR_FALSE",
     "DISCURSIVE",
   ];
@@ -165,7 +166,8 @@ export function Filters({ filterValues, filters, onChange }: FiltersProps) {
             </p>
             <div className="flex flex-wrap gap-3">
               {[
-                { value: "MULTIPLE_CHOICE", label: "Multipla Escolha" },
+                { value: "MULTIPLE_CHOICE", label: "Multipla Escolha (5)" },
+                { value: "MULTIPLE_CHOICE_FOUR", label: "Multipla Escolha (4)" },
                 { value: "TRUE_OR_FALSE", label: "Certo/Errado" },
                 { value: "DISCURSIVE", label: "Discursiva" },
               ].map((t) => (
@@ -220,7 +222,7 @@ export function Filters({ filterValues, filters, onChange }: FiltersProps) {
             onClick={() =>
               onChange({
                 page: 1,
-                types: ["MULTIPLE_CHOICE", "TRUE_OR_FALSE", "DISCURSIVE"],
+                types: ["MULTIPLE_CHOICE", "MULTIPLE_CHOICE_FOUR", "TRUE_OR_FALSE", "DISCURSIVE"],
               })
             }
             className="w-full mt-2 py-2 rounded-xl bg-incorrect/20 text-incorrect text-xs font-semibold hover:bg-incorrect/30 transition-colors"

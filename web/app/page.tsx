@@ -1,15 +1,30 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Header } from "@/components/Header";
 import { Filters } from "@/components/Filters";
 import { QuestionCard } from "@/components/QuestionCard";
 import { Pagination } from "@/components/Pagination";
 import { useAnswers } from "@/hooks/useAnswers";
-import { fetchQuestions, fetchFilterValues, PER_PAGE } from "@/lib/queries";
 import type { Question, FilterValues, Filters as FiltersType } from "@/lib/types";
+
+const PER_PAGE = 50;
+
+function filtersToParams(filters: FiltersType): string {
+  const sp = new URLSearchParams();
+  sp.set("page", String(filters.page || 1));
+  if (filters.search) sp.set("search", filters.search);
+  if (filters.specialties?.length) sp.set("specialties", filters.specialties.join(","));
+  if (filters.institutions?.length) sp.set("institutions", filters.institutions.join(","));
+  if (filters.years?.length) sp.set("years", filters.years.join(","));
+  if (filters.finalidades?.length) sp.set("finalidades", filters.finalidades.join(","));
+  if (filters.bancas?.length) sp.set("bancas", filters.bancas.join(","));
+  if (filters.regions?.length) sp.set("regions", filters.regions.join(","));
+  if (filters.types?.length) sp.set("types", filters.types.join(","));
+  if (filters.showOutdated === false) sp.set("showOutdated", "false");
+  if (filters.showCanceled === false) sp.set("showCanceled", "false");
+  return sp.toString();
+}
 
 export default function Home() {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -17,7 +32,7 @@ export default function Home() {
   const [filterValues, setFilterValues] = useState<FilterValues | null>(null);
   const [filters, setFilters] = useState<FiltersType>({
     page: 1,
-    types: ["MULTIPLE_CHOICE", "TRUE_OR_FALSE", "DISCURSIVE"],
+    types: ["MULTIPLE_CHOICE", "MULTIPLE_CHOICE_FOUR", "TRUE_OR_FALSE", "DISCURSIVE"],
   });
   const [loading, setLoading] = useState(true);
   const { answers, save, clear, stats } = useAnswers();
@@ -25,7 +40,10 @@ export default function Home() {
 
   // Load filter values once
   useEffect(() => {
-    fetchFilterValues().then(setFilterValues).catch(console.error);
+    fetch("/api/filters")
+      .then((r) => r.json())
+      .then(setFilterValues)
+      .catch(console.error);
   }, []);
 
   // Load questions when filters change
@@ -33,8 +51,9 @@ export default function Home() {
     let cancelled = false;
     setLoading(true);
 
-    fetchQuestions(filters)
-      .then(({ data, count }) => {
+    fetch(`/api/questions?${filtersToParams(filters)}`)
+      .then((r) => r.json())
+      .then(({ data, count }: { data: Question[]; count: number }) => {
         if (cancelled) return;
         setQuestions(data);
         setTotalCount(count);
@@ -52,7 +71,6 @@ export default function Home() {
   }, [filters]);
 
   const handleFilterChange = useCallback((newFilters: FiltersType) => {
-    // Debounce text search
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (newFilters.search !== undefined) {
@@ -64,13 +82,10 @@ export default function Home() {
     }
   }, []);
 
-  const handlePageChange = useCallback(
-    (page: number) => {
-      setFilters((prev) => ({ ...prev, page }));
-      window.scrollTo(0, 0);
-    },
-    []
-  );
+  const handlePageChange = useCallback((page: number) => {
+    setFilters((prev) => ({ ...prev, page }));
+    window.scrollTo(0, 0);
+  }, []);
 
   const totalPages = Math.ceil(totalCount / PER_PAGE);
   const currentPage = filters.page || 1;

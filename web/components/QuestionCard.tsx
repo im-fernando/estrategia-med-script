@@ -12,6 +12,7 @@ interface QuestionCardProps {
 
 const TYPE_LABELS: Record<string, string> = {
   MULTIPLE_CHOICE: "Multipla Escolha",
+  MULTIPLE_CHOICE_FOUR: "Multipla Escolha (4)",
   TRUE_OR_FALSE: "Certo/Errado",
   DISCURSIVE: "Discursiva",
 };

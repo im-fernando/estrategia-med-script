@@ -53,6 +53,10 @@ def create_db(db_path: str = DB_PATH) -> sqlite3.Connection:
             FOREIGN KEY (question_id) REFERENCES questions(id)
         );
 
+        CREATE TABLE specialties (
+            name TEXT PRIMARY KEY
+        );
+
         CREATE INDEX idx_q_type ON questions(answer_type);
         CREATE INDEX idx_q_year ON questions(year);
         CREATE INDEX idx_q_institution ON questions(institution);
@@ -160,6 +164,23 @@ def build_from_jsonl(jsonl_path: str, db_path: str = DB_PATH) -> int:
                 continue
 
     conn.commit()
+
+    # Popular tabela de especialidades
+    print(f"\n  Extraindo especialidades...")
+    rows = conn.execute("SELECT DISTINCT topics FROM questions WHERE topics != '[]'").fetchall()
+    specs = set()
+    for r in rows:
+        try:
+            for t in json.loads(r[0]):
+                name = (t.get("n") or "").strip()
+                if name:
+                    specs.add(name)
+        except json.JSONDecodeError:
+            pass
+    for name in specs:
+        conn.execute("INSERT OR IGNORE INTO specialties (name) VALUES (?)", (name,))
+    conn.commit()
+    print(f"  {len(specs)} especialidades inseridas.")
 
     # Otimizar pra leitura
     conn.execute("ANALYZE")
